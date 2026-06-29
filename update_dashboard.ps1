@@ -1,12 +1,17 @@
 $ErrorActionPreference = "Stop"
 
-$source = "F:\llqdocument\大成文件\客户贡献分析\26年与25年_1-5月数据对比分析.html"
-$target = Join-Path $PSScriptRoot "index.html"
-$source2026 = "F:\llqdocument\大成文件\客户贡献分析\2026年1-5月数据分析仪表盘.html"
-$target2026 = Join-Path $PSScriptRoot "2026-dashboard.html"
+if (-not $env:DASHBOARD_PASSWORD) {
+    $secure = Read-Host "请输入看板访问密码" -AsSecureString
+    $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+    try {
+        $env:DASHBOARD_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)
+    }
+    finally {
+        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr)
+    }
+}
 
-Copy-Item -LiteralPath $source -Destination $target -Force
-Copy-Item -LiteralPath $source2026 -Destination $target2026 -Force
+node (Join-Path $PSScriptRoot "tools\encrypt_pages.js")
 
 git -C $PSScriptRoot diff --quiet -- index.html 2026-dashboard.html
 if ($LASTEXITCODE -eq 0) {
