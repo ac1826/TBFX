@@ -417,8 +417,7 @@ function buildPortalShell(payload) {
     <section class="hero" id="lockedView">
       <div class="intro">
         <span class="kicker">经营分析入口</span>
-        <h1>把客户贡献、同比变化和区域表现集中到一个入口。</h1>
-        <p class="lead">这里承载两份离线看板的线上访问版本。页面内容经过压缩和加密，输入访问密码后才会在当前浏览器本地解密。</p>
+        <h1>客户贡献分析</h1>
         <div class="meta-grid">
           <div class="meta"><b>2</b><span>份核心看板</span></div>
           <div class="meta"><b>AES-GCM</b><span>浏览器本地解密</span></div>
@@ -447,7 +446,6 @@ function buildPortalShell(payload) {
       <h2>选择看板</h2>
       <p>已解锁。请选择要查看的分析页面，打开时会继续在当前浏览器内解密。</p>
       <div class="cards" id="cards"></div>
-      <div class="hint" id="updatedAt"></div>
     </section>
   </main>
 
@@ -460,7 +458,6 @@ function buildPortalShell(payload) {
     const lockedView = document.getElementById("lockedView");
     const portalView = document.getElementById("portalView");
     const cardsEl = document.getElementById("cards");
-    const updatedAtEl = document.getElementById("updatedAt");
 
     let unlockedPassword = sessionStorage.getItem("tbfx-dashboard-password") || "";
 
@@ -535,7 +532,6 @@ function buildPortalShell(payload) {
           '<a class="' + cls + '" href="' + page.href + '" data-open="' + page.id + '">打开看板</a>' +
         '</article>';
       }).join("");
-      updatedAtEl.textContent = "加密发布时间：" + new Date(PORTAL.generatedAt).toLocaleString("zh-CN");
       document.querySelectorAll("[data-open]").forEach((link) => {
         link.addEventListener("click", async (event) => {
           event.preventDefault();
