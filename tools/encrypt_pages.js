@@ -12,26 +12,26 @@ if (!password) {
 const root = path.resolve(__dirname, "..");
 const sourcePages = [
   {
-    id: "yoy",
-    title: "2026 vs 2025 同比分析",
-    eyebrow: "累计同比 · 1-5月",
-    subtitle: "销量、销额、净边贡的同比增减、结构贡献和省份变化。",
+    id: "single2026",
+    title: "2026年累计贡献分析",
+    eyebrow: "",
+    subtitle: "销量、销额、净边贡的同比增减，渠道 产品 区域 变化",
     href: "./",
-    source: "F:\\llqdocument\\大成文件\\客户贡献分析\\26年与25年_1-5月数据对比分析.html",
+    source: "F:\\llqdocument\\大成文件\\客户贡献分析\\2026年1-5月数据分析仪表盘.html",
     output: path.join(root, "index.html"),
-    defaultRoute: "yoy",
-    facts: ["省份同比地图", "客户贡献变化", "渠道/品类结构"],
+    defaultRoute: "single2026",
+    facts: [],
   },
   {
-    id: "single2026",
-    title: "2026年1-5月客户贡献分析",
-    eyebrow: "经营贡献 · 2026",
-    subtitle: "聚焦 2026 年 1-5 月客户、省市、渠道、品类和大区贡献。",
+    id: "yoy",
+    title: "2026 vs 2025 同比分析",
+    eyebrow: "",
+    subtitle: "销量、销额、净边贡的同比增减，渠道 产品 区域 变化",
     href: "./2026-dashboard.html",
-    source: "F:\\llqdocument\\大成文件\\客户贡献分析\\2026年1-5月数据分析仪表盘.html",
+    source: "F:\\llqdocument\\大成文件\\客户贡献分析\\26年与25年_1-5月数据对比分析.html",
     output: path.join(root, "2026-dashboard.html"),
-    defaultRoute: "single2026",
-    facts: ["客户排名", "地图下钻", "大区/渠道筛选"],
+    defaultRoute: "yoy",
+    facts: [],
   },
 ];
 
@@ -92,7 +92,7 @@ function buildPortalShell(payload) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>客户贡献分析平台</title>
+  <title>PFS销售数据分析平台</title>
   <style>
     :root {
       color-scheme: light;
@@ -410,14 +410,14 @@ function buildPortalShell(payload) {
 <body>
   <main class="page">
     <div class="topbar">
-      <div class="mark">TBFX 客户贡献分析平台</div>
+      <div class="mark">PFS销售数据分析平台</div>
       <div>GitHub Pages · 本地解密 · 加密发布</div>
     </div>
 
     <section class="hero" id="lockedView">
       <div class="intro">
         <span class="kicker">经营分析入口</span>
-        <h1>客户贡献分析</h1>
+        <h1>PFS销售数据分析平台</h1>
         <div class="meta-grid">
           <div class="meta"><b>2</b><span>份核心看板</span></div>
           <div class="meta"><b>AES-GCM</b><span>浏览器本地解密</span></div>
@@ -522,13 +522,11 @@ function buildPortalShell(payload) {
       lockedView.style.display = "none";
       portalView.classList.add("active");
       cardsEl.innerHTML = PORTAL.pages.map((page, index) => {
-        const chips = page.facts.map((fact) => '<span class="chip">' + escapeHtml(fact) + '</span>').join("");
         const cls = index === 0 ? "open-btn" : "open-btn secondary";
         return '<article class="card">' +
-          '<div><small>' + escapeHtml(page.eyebrow) + '</small>' +
+          '<div>' + (page.eyebrow ? '<small>' + escapeHtml(page.eyebrow) + '</small>' : '') +
           '<h3>' + escapeHtml(page.title) + '</h3>' +
-          '<p>' + escapeHtml(page.subtitle) + '</p>' +
-          '<div class="chips">' + chips + '</div></div>' +
+          '<p>' + escapeHtml(page.subtitle) + '</p></div>' +
           '<a class="' + cls + '" href="' + page.href + '" data-open="' + page.id + '">打开看板</a>' +
         '</article>';
       }).join("");
