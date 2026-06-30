@@ -166,7 +166,8 @@ function buildPortalShell(payload) {
       backdrop-filter: blur(16px);
     }
     .intro {
-      padding: 34px;
+      min-height: 355px;
+      padding: 42px 48px;
       overflow: hidden;
       position: relative;
       display: grid;
@@ -183,16 +184,26 @@ function buildPortalShell(payload) {
       border-radius: 50%;
       border: 42px solid rgba(18, 88, 184, .08);
     }
+    .intro-content {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      justify-items: center;
+      align-content: center;
+      gap: 20px;
+      width: 100%;
+      transform: translateY(8px);
+    }
     .kicker {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      padding: 7px 10px;
+      padding: 8px 14px;
       border: 1px solid #cddced;
       border-radius: 999px;
       background: #f7fbff;
       color: #1f5c9d;
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 800;
     }
     .kicker::before {
@@ -204,10 +215,10 @@ function buildPortalShell(payload) {
       box-shadow: 0 0 0 5px rgba(0, 160, 131, .13);
     }
     h1 {
-      margin: 18px auto 12px;
-      max-width: 680px;
-      font-size: clamp(34px, 5vw, 58px);
-      line-height: 1.03;
+      margin: 0 auto;
+      max-width: 760px;
+      font-size: clamp(44px, 5.9vw, 76px);
+      line-height: 1.08;
       letter-spacing: 0;
       text-align: center;
     }
@@ -432,6 +443,8 @@ function buildPortalShell(payload) {
       .password-row { grid-template-columns: 1fr; }
       button { width: 100%; }
       .intro, .login, .portal { padding: 22px; border-radius: 16px; }
+      .intro { min-height: 260px; }
+      .intro-content { gap: 16px; transform: none; }
       h1 { font-size: 34px; }
     }
   </style>
@@ -445,8 +458,10 @@ function buildPortalShell(payload) {
 
     <section class="hero" id="lockedView">
       <div class="intro">
-        <span class="kicker">经营分析入口</span>
-        <h1>PFS销售数据分析看板</h1>
+        <div class="intro-content">
+          <span class="kicker">经营分析入口</span>
+          <h1>PFS销售数据分析看板</h1>
+        </div>
       </div>
 
       <div class="login">
