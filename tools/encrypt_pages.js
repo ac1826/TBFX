@@ -316,6 +316,54 @@ function buildPortalShell(payload) {
       padding: 28px;
     }
     .portal.active { display: block; }
+    .dashboard-view {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      background: #f4f7fb;
+    }
+    .dashboard-view.active { display: block; }
+    .dashboard-toolbar {
+      position: fixed;
+      left: 18px;
+      top: 18px;
+      z-index: 1002;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px;
+      border: 1px solid rgba(15, 23, 42, .14);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .94);
+      box-shadow: 0 16px 42px rgba(8, 31, 61, .18);
+      backdrop-filter: blur(12px);
+    }
+    .return-btn {
+      height: 36px;
+      border-radius: 999px;
+      padding: 0 14px;
+      background: #0f7665;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 900;
+    }
+    .dashboard-title {
+      max-width: 320px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #334155;
+      font-size: 13px;
+      font-weight: 800;
+      padding-right: 8px;
+    }
+    .dashboard-frame {
+      width: 100%;
+      height: 100vh;
+      border: 0;
+      background: #fff;
+    }
     .cards {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -446,6 +494,14 @@ function buildPortalShell(payload) {
       <h2>选择看板</h2>
       <div class="cards" id="cards"></div>
     </section>
+
+    <section class="dashboard-view" id="dashboardView">
+      <div class="dashboard-toolbar">
+        <button class="return-btn" id="returnPortal" type="button">返回选择报表</button>
+        <span class="dashboard-title" id="dashboardTitle"></span>
+      </div>
+      <iframe class="dashboard-frame" id="dashboardFrame" title="PFS销售数据分析看板"></iframe>
+    </section>
   </main>
 
   <script>
@@ -457,8 +513,13 @@ function buildPortalShell(payload) {
     const lockedView = document.getElementById("lockedView");
     const portalView = document.getElementById("portalView");
     const cardsEl = document.getElementById("cards");
+    const dashboardView = document.getElementById("dashboardView");
+    const dashboardFrame = document.getElementById("dashboardFrame");
+    const dashboardTitle = document.getElementById("dashboardTitle");
+    const returnPortal = document.getElementById("returnPortal");
 
     let unlockedPassword = sessionStorage.getItem("tbfx-dashboard-password") || "";
+    let activeDashboardUrl = "";
 
     function fromBase64(value) {
       const binary = atob(value);
@@ -562,13 +623,19 @@ function buildPortalShell(payload) {
       const page = pageById(id);
       statusEl.textContent = "";
       try {
-        const html = addReturnControl(await decryptPage(unlockedPassword, page));
-        document.open();
-        document.write(html);
-        document.close();
+        const html = await decryptPage(unlockedPassword, page);
+        if (activeDashboardUrl) URL.revokeObjectURL(activeDashboardUrl);
+        activeDashboardUrl = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
+        dashboardTitle.textContent = page.title;
+        dashboardFrame.src = activeDashboardUrl;
+        portalView.classList.remove("active");
+        lockedView.style.display = "none";
+        dashboardView.classList.add("active");
       } catch (error) {
         sessionStorage.removeItem("tbfx-dashboard-password");
         unlockedPassword = "";
+        dashboardView.classList.remove("active");
+        dashboardFrame.removeAttribute("src");
         portalView.classList.remove("active");
         lockedView.style.display = "";
         unlockEl.disabled = false;
@@ -576,14 +643,14 @@ function buildPortalShell(payload) {
       }
     }
 
-    function addReturnControl(html) {
-      const control = '<style id="tbfx-return-style">' +
-        '#tbfx-return-portal{position:fixed;left:18px;top:18px;z-index:2147483647;border:1px solid rgba(15,23,42,.16);background:rgba(255,255,255,.94);color:#0b2341;border-radius:999px;padding:9px 14px;font:700 14px/1.2 Microsoft YaHei,Segoe UI,Arial,sans-serif;box-shadow:0 12px 32px rgba(8,31,61,.18);cursor:pointer;backdrop-filter:blur(10px)}' +
-        '#tbfx-return-portal:hover{background:#0f7665;color:#fff}' +
-        '</style><button id="tbfx-return-portal" type="button">返回选择报表</button>' +
-        '<script id="tbfx-return-script">document.getElementById("tbfx-return-portal").addEventListener("click",function(){location.href="./";});<\\/script>';
-      if (html.includes("</body>")) return html.replace("</body>", control + "</body>");
-      return html + control;
+    function returnToPortal() {
+      dashboardView.classList.remove("active");
+      dashboardFrame.removeAttribute("src");
+      if (activeDashboardUrl) {
+        URL.revokeObjectURL(activeDashboardUrl);
+        activeDashboardUrl = "";
+      }
+      showPortal();
     }
 
     function escapeHtml(value) {
@@ -595,6 +662,7 @@ function buildPortalShell(payload) {
     }
 
     unlockEl.addEventListener("click", unlockPortal);
+    returnPortal.addEventListener("click", returnToPortal);
     passwordEl.addEventListener("keydown", (event) => {
       if (event.key === "Enter") unlockPortal();
     });
