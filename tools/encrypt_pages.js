@@ -216,11 +216,12 @@ function buildPortalShell(payload) {
     }
     h1 {
       margin: 0 auto;
-      max-width: 760px;
-      font-size: clamp(44px, 5.9vw, 76px);
+      max-width: 980px;
+      font-size: clamp(42px, 4.6vw, 58px);
       line-height: 1.08;
       letter-spacing: 0;
       text-align: center;
+      white-space: nowrap;
     }
     .lead {
       max-width: 660px;
@@ -445,7 +446,7 @@ function buildPortalShell(payload) {
       .intro, .login, .portal { padding: 22px; border-radius: 16px; }
       .intro { min-height: 260px; }
       .intro-content { gap: 16px; transform: none; }
-      h1 { font-size: 34px; }
+      h1 { font-size: 34px; white-space: normal; }
     }
   </style>
 </head>
