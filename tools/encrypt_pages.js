@@ -92,7 +92,7 @@ function buildPortalShell(payload) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PFS销售数据分析平台</title>
+  <title>PFS销售数据分析看板</title>
   <style>
     :root {
       color-scheme: light;
@@ -410,14 +410,14 @@ function buildPortalShell(payload) {
 <body>
   <main class="page">
     <div class="topbar">
-      <div class="mark">PFS销售数据分析平台</div>
+      <div class="mark">PFS销售数据分析看板</div>
       <div>GitHub Pages · 本地解密 · 加密发布</div>
     </div>
 
     <section class="hero" id="lockedView">
       <div class="intro">
         <span class="kicker">经营分析入口</span>
-        <h1>PFS销售数据分析平台</h1>
+        <h1>PFS销售数据分析看板</h1>
         <div class="meta-grid">
           <div class="meta"><b>2</b><span>份核心看板</span></div>
           <div class="meta"><b>AES-GCM</b><span>浏览器本地解密</span></div>
@@ -444,7 +444,6 @@ function buildPortalShell(payload) {
 
     <section class="portal" id="portalView">
       <h2>选择看板</h2>
-      <p>已解锁。请选择要查看的分析页面，打开时会继续在当前浏览器内解密。</p>
       <div class="cards" id="cards"></div>
     </section>
   </main>
@@ -563,7 +562,7 @@ function buildPortalShell(payload) {
       const page = pageById(id);
       statusEl.textContent = "";
       try {
-        const html = await decryptPage(unlockedPassword, page);
+        const html = addReturnControl(await decryptPage(unlockedPassword, page));
         document.open();
         document.write(html);
         document.close();
@@ -575,6 +574,16 @@ function buildPortalShell(payload) {
         unlockEl.disabled = false;
         statusEl.textContent = "解密失败，请重新输入密码。";
       }
+    }
+
+    function addReturnControl(html) {
+      const control = '<style id="tbfx-return-style">' +
+        '#tbfx-return-portal{position:fixed;left:18px;top:18px;z-index:2147483647;border:1px solid rgba(15,23,42,.16);background:rgba(255,255,255,.94);color:#0b2341;border-radius:999px;padding:9px 14px;font:700 14px/1.2 Microsoft YaHei,Segoe UI,Arial,sans-serif;box-shadow:0 12px 32px rgba(8,31,61,.18);cursor:pointer;backdrop-filter:blur(10px)}' +
+        '#tbfx-return-portal:hover{background:#0f7665;color:#fff}' +
+        '</style><button id="tbfx-return-portal" type="button">返回选择报表</button>' +
+        '<script id="tbfx-return-script">document.getElementById("tbfx-return-portal").addEventListener("click",function(){location.href="./";});<\\/script>';
+      if (html.includes("</body>")) return html.replace("</body>", control + "</body>");
+      return html + control;
     }
 
     function escapeHtml(value) {
