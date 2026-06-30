@@ -214,28 +214,6 @@ function buildPortalShell(payload) {
       font-size: 16px;
       line-height: 1.85;
     }
-    .meta-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
-      margin-top: 28px;
-      max-width: 700px;
-    }
-    .meta {
-      padding: 16px;
-      border: 1px solid #dbe6f2;
-      border-radius: 14px;
-      background: rgba(248, 251, 255, .78);
-    }
-    .meta b {
-      display: block;
-      margin-bottom: 5px;
-      font-size: 18px;
-    }
-    .meta span {
-      color: #667b94;
-      font-size: 12px;
-    }
     .login {
       padding: 28px;
       display: grid;
@@ -444,7 +422,6 @@ function buildPortalShell(payload) {
     .secure-note b { color: var(--ink); }
     @media (max-width: 900px) {
       .hero, .cards { grid-template-columns: 1fr; }
-      .meta-grid { grid-template-columns: 1fr; }
       .page { align-content: start; padding-top: 22px; }
     }
     @media (max-width: 560px) {
@@ -466,11 +443,6 @@ function buildPortalShell(payload) {
       <div class="intro">
         <span class="kicker">经营分析入口</span>
         <h1>PFS销售数据分析看板</h1>
-        <div class="meta-grid">
-          <div class="meta"><b>2</b><span>份核心看板</span></div>
-          <div class="meta"><b>AES-GCM</b><span>浏览器本地解密</span></div>
-          <div class="meta"><b>2026 · 1-5月</b><span>当前分析周期</span></div>
-        </div>
       </div>
 
       <div class="login">
