@@ -169,6 +169,9 @@ function buildPortalShell(payload) {
       padding: 34px;
       overflow: hidden;
       position: relative;
+      display: grid;
+      place-items: center;
+      text-align: center;
     }
     .intro::after {
       content: "";
@@ -201,11 +204,12 @@ function buildPortalShell(payload) {
       box-shadow: 0 0 0 5px rgba(0, 160, 131, .13);
     }
     h1 {
-      margin: 18px 0 12px;
+      margin: 18px auto 12px;
       max-width: 680px;
       font-size: clamp(34px, 5vw, 58px);
       line-height: 1.03;
       letter-spacing: 0;
+      text-align: center;
     }
     .lead {
       max-width: 660px;
