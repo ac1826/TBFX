@@ -13,7 +13,7 @@ const root = path.resolve(__dirname, "..");
 const sourcePages = [
   {
     id: "single2026",
-    title: "2026年数据看板",
+    title: "2026年累计贡献分析",
     eyebrow: "",
     subtitle: "销量、销额、净边贡的同比增减，渠道 产品 区域 变化",
     href: "./",
