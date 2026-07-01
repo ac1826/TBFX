@@ -75,11 +75,15 @@ const encryptedPages = sourcePages.map((page) => {
     encrypted,
   };
 });
+const verifierText = "tbfx-portal-ok-v1";
+const verifier = encryptBuffer(Buffer.from(verifierText, "utf8"));
 
 for (const page of sourcePages) {
   const html = buildPortalShell({
     defaultRoute: page.defaultRoute,
     generatedAt: new Date().toISOString(),
+    verifier,
+    verifierText,
     pages: encryptedPages,
   });
   fs.writeFileSync(page.output, html, "utf8");
@@ -599,7 +603,8 @@ function buildPortalShell(payload) {
       unlockEl.disabled = true;
       statusEl.textContent = "正在验证密码...";
       try {
-        await decryptPage(password, pageById(PORTAL.defaultRoute));
+        const verifier = await decryptPage(password, { encrypted: PORTAL.verifier });
+        if (verifier !== PORTAL.verifierText) throw new Error("Verifier mismatch");
         unlockedPassword = password;
         sessionStorage.setItem("tbfx-dashboard-password", password);
         statusEl.textContent = "";
@@ -615,14 +620,16 @@ function buildPortalShell(payload) {
       const page = pageById(id);
       statusEl.textContent = "";
       try {
+        dashboardTitle.textContent = page.title + " - 正在打开...";
+        dashboardFrame.removeAttribute("src");
+        portalView.classList.remove("active");
+        lockedView.style.display = "none";
+        dashboardView.classList.add("active");
         const html = await decryptPage(unlockedPassword, page);
         if (activeDashboardUrl) URL.revokeObjectURL(activeDashboardUrl);
         activeDashboardUrl = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
         dashboardTitle.textContent = page.title;
         dashboardFrame.src = activeDashboardUrl;
-        portalView.classList.remove("active");
-        lockedView.style.display = "none";
-        dashboardView.classList.add("active");
       } catch (error) {
         sessionStorage.removeItem("tbfx-dashboard-password");
         unlockedPassword = "";

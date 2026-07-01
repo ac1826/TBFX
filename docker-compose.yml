@@ -1,0 +1,8 @@
+services:
+  tbfx-dashboard:
+    build: .
+    image: tbfx-dashboard:latest
+    container_name: tbfx-dashboard
+    restart: unless-stopped
+    ports:
+      - "8080:80"
