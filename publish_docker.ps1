@@ -19,9 +19,11 @@ if (-not $SkipEncrypt) {
         }
     }
     node (Join-Path $Root "tools\encrypt_pages.js")
+    if ($LASTEXITCODE -ne 0) { throw "Dashboard encryption failed." }
 }
 
 docker build -t $ImageName $Root
+if ($LASTEXITCODE -ne 0) { throw "Docker image build failed." }
 
 $existing = docker ps -aq --filter "name=^tbfx-dashboard$"
 if ($existing) {
@@ -33,6 +35,7 @@ docker run -d `
     --restart unless-stopped `
     -p "${Port}:80" `
     $ImageName | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "Docker container start failed." }
 
 Write-Host "Docker dashboard started: http://localhost:$Port/"
 Write-Host "For LAN access, replace localhost with this server's IP address."
