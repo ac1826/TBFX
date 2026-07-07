@@ -197,37 +197,20 @@ def render_portal() -> None:
     cards = []
     for key, dashboard in DASHBOARDS.items():
         cards.append(
-            f"""
-            <article class="dashboard-card">
-                <div>
-                    <h2>{dashboard["title"]}</h2>
-                    <p>{dashboard["description"]}</p>
-                </div>
-                <a class="open-link {dashboard["button_class"]}" href="?dashboard={key}" target="_self">
-                    打开看板
-                </a>
-            </article>
-            """
+            f'<article class="dashboard-card">'
+            f'<div><h2>{dashboard["title"]}</h2><p>{dashboard["description"]}</p></div>'
+            f'<a class="open-link {dashboard["button_class"]}" href="?dashboard={key}" target="_self">打开看板</a>'
+            f'</article>'
         )
 
     st.markdown(
-        f"""
-        <main class="portal-shell">
-            <div class="topbar">
-                <div class="brand">
-                    <div class="brand-mark"></div>
-                    <div>{APP_TITLE}</div>
-                </div>
-                <div class="portal-note">Streamlit 托管 · 两份 HTML 整合入口</div>
-            </div>
-            <section class="chooser">
-                <h1>选择看板</h1>
-                <div class="dashboard-grid">
-                    {''.join(cards)}
-                </div>
-            </section>
-        </main>
-        """,
+        f'<main class="portal-shell">'
+        f'<div class="topbar">'
+        f'<div class="brand"><div class="brand-mark"></div><div>{APP_TITLE}</div></div>'
+        f'<div class="portal-note">Streamlit 托管 · 两份 HTML 整合入口</div>'
+        f'</div>'
+        f'<section class="chooser"><h1>选择看板</h1><div class="dashboard-grid">{"".join(cards)}</div></section>'
+        f'</main>',
         unsafe_allow_html=True,
     )
 
