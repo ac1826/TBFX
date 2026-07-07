@@ -28,7 +28,7 @@ const sourcePages = [
     eyebrow: "",
     subtitle: "销量、销额、净边贡的同比增减，渠道 产品 区域 变化",
     href: "./2026-dashboard.html",
-    source: "F:\\llqdocument\\大成文件\\客户贡献分析\\26年与25年_1-5月数据对比分析.html",
+    source: "F:\\llqdocument\\大成文件\\客户贡献分析\\26年与25年_1-6月数据对比分析.html",
     output: path.join(root, "2026-dashboard.html"),
     defaultRoute: "yoy",
     facts: [],
