@@ -27,45 +27,36 @@ st.markdown(
     """
     <style>
     #MainMenu, header, footer {visibility: hidden;}
-    .block-container {
-        max-width: 100%;
-        padding: 0;
-    }
-    .portal-shell {
-        min-height: 100vh;
-        padding: 78px 7vw;
+    .stApp {
         background:
             linear-gradient(rgba(177, 205, 236, .34) 1px, transparent 1px),
             linear-gradient(90deg, rgba(177, 205, 236, .34) 1px, transparent 1px),
             radial-gradient(circle at 12% 8%, rgba(255,255,255,.9), transparent 28%),
             linear-gradient(120deg, #dfeefa 0%, #f7fbff 48%, #d9f0f2 100%);
         background-size: 48px 48px, 48px 48px, auto, auto;
-        color: #08213f;
-        box-sizing: border-box;
     }
-    .portal-inner {
-        border: 1px solid rgba(143, 172, 205, .48);
-        border-radius: 26px;
-        background: rgba(255,255,255,.88);
-        padding: 44px;
-        box-shadow: 0 24px 68px rgba(8, 33, 63, .10);
+    .block-container {
+        max-width: 1220px;
+        padding-top: 54px;
+        padding-bottom: 44px;
     }
-    .topbar {
+    .portal-topbar {
         display: flex;
         align-items: center;
         justify-content: space-between;
         margin-bottom: 28px;
     }
-    .brand {
+    .portal-brand {
         display: flex;
         align-items: center;
         gap: 14px;
-        font-size: 20px;
+        color: #08213f;
+        font-size: 21px;
         font-weight: 800;
     }
-    .brand-mark {
-        width: 48px;
-        height: 48px;
+    .portal-mark {
+        width: 46px;
+        height: 46px;
         border-radius: 12px;
         background: linear-gradient(135deg, #1565c0, #009688);
         box-shadow: 0 18px 34px rgba(0, 96, 120, .18);
@@ -74,38 +65,55 @@ st.markdown(
         color: #29445f;
         font-size: 15px;
     }
+    .portal-card {
+        border: 1px solid rgba(143, 172, 205, .48);
+        border-radius: 24px;
+        background: rgba(255,255,255,.88);
+        padding: 34px;
+        box-shadow: 0 22px 58px rgba(8, 33, 63, .10);
+    }
+    .portal-card h1 {
+        margin: 0 0 24px 0;
+        color: #08213f;
+        font-size: 34px;
+        letter-spacing: 0;
+    }
+    div[data-testid="column"] {
+        border: 1px solid #d6e4f2;
+        border-radius: 20px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+        padding: 26px 28px 24px 28px;
+        min-height: 230px;
+    }
     .stButton > button {
         width: 100%;
-        min-height: 58px;
-        border-radius: 13px;
+        min-height: 54px;
+        border-radius: 12px;
         border: 0;
         background: #0f766e;
         color: #fff;
-        font-size: 20px;
+        font-size: 18px;
         font-weight: 800;
     }
-    .viewer-header {
-        position: sticky;
-        top: 0;
-        z-index: 20;
+    .viewer-title {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 18px;
+        gap: 16px;
         padding: 14px 18px;
-        background: #f4f7fb;
-        border-bottom: 1px solid #d8e4f2;
-    }
-    .viewer-title {
+        margin-bottom: 12px;
+        border: 1px solid #d8e4f2;
+        border-radius: 14px;
+        background: rgba(255,255,255,.92);
+        color: #08213f;
         font-size: 20px;
         font-weight: 800;
-        color: #08213f;
     }
     @media (max-width: 900px) {
-        .portal-shell { padding: 36px 18px; }
-        .portal-inner { padding: 24px; }
-        .topbar { display: block; }
+        .block-container { padding: 28px 18px; }
+        .portal-topbar { display: block; }
         .portal-note { margin-top: 12px; }
+        .portal-card { padding: 22px; }
     }
     </style>
     """,
@@ -133,33 +141,30 @@ def go_home() -> None:
 def render_portal() -> None:
     missing_files = [item["filename"] for item in DASHBOARDS.values() if not (STATIC_DIR / item["filename"]).exists()]
 
-    st.markdown('<main class="portal-shell">', unsafe_allow_html=True)
     st.markdown(
         f"""
-        <div class="topbar">
-            <div class="brand"><div class="brand-mark"></div><div>{APP_TITLE}</div></div>
+        <div class="portal-topbar">
+            <div class="portal-brand"><div class="portal-mark"></div><div>{APP_TITLE}</div></div>
             <div class="portal-note">Streamlit 托管 · 两份 HTML 整合入口</div>
         </div>
-        <section class="portal-inner">
+        <div class="portal-card"><h1>选择看板</h1></div>
         """,
         unsafe_allow_html=True,
     )
-    st.title("选择看板")
 
     if missing_files:
         st.error("缺少报表文件：" + "、".join(missing_files))
-    else:
-        left, right = st.columns(2, gap="large")
-        with left:
-            st.subheader(DASHBOARDS["sales"]["title"])
-            st.write(DASHBOARDS["sales"]["description"])
-            st.button("打开看板", key="open_sales", on_click=choose_dashboard, args=("sales",))
-        with right:
-            st.subheader(DASHBOARDS["yoy"]["title"])
-            st.write(DASHBOARDS["yoy"]["description"])
-            st.button("打开看板", key="open_yoy", on_click=choose_dashboard, args=("yoy",))
+        return
 
-    st.markdown("</section></main>", unsafe_allow_html=True)
+    left, right = st.columns(2, gap="large")
+    with left:
+        st.subheader(DASHBOARDS["sales"]["title"])
+        st.write(DASHBOARDS["sales"]["description"])
+        st.button("打开看板", key="open_sales", on_click=choose_dashboard, args=("sales",))
+    with right:
+        st.subheader(DASHBOARDS["yoy"]["title"])
+        st.write(DASHBOARDS["yoy"]["description"])
+        st.button("打开看板", key="open_yoy", on_click=choose_dashboard, args=("yoy",))
 
 
 def render_dashboard(dashboard_key: str) -> None:
@@ -169,14 +174,7 @@ def render_dashboard(dashboard_key: str) -> None:
         st.error(f"找不到报表文件：{dashboard['filename']}")
         return
 
-    st.markdown(
-        f"""
-        <div class="viewer-header">
-            <div class="viewer-title">{dashboard["title"]}</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.markdown(f'<div class="viewer-title">{dashboard["title"]}</div>', unsafe_allow_html=True)
     st.button("返回选择看板", on_click=go_home)
     html = path.read_text(encoding="utf-8", errors="replace")
     components.html(html, height=1200, scrolling=True)
