@@ -124,12 +124,10 @@ def dashboard_file(dashboard_key: str) -> Path:
 
 def choose_dashboard(dashboard_key: str) -> None:
     st.query_params["dashboard"] = dashboard_key
-    st.rerun()
 
 
 def go_home() -> None:
     st.query_params.clear()
-    st.rerun()
 
 
 def render_portal() -> None:
