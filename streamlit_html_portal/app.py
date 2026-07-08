@@ -31,32 +31,31 @@ st.markdown(
         background:
             linear-gradient(rgba(177, 205, 236, .34) 1px, transparent 1px),
             linear-gradient(90deg, rgba(177, 205, 236, .34) 1px, transparent 1px),
-            radial-gradient(circle at 12% 8%, rgba(255,255,255,.9), transparent 28%),
-            linear-gradient(120deg, #dfeefa 0%, #f7fbff 48%, #d9f0f2 100%);
+            radial-gradient(circle at 14% 8%, rgba(255,255,255,.92), transparent 28%),
+            linear-gradient(120deg, #dfeefa 0%, #f8fbff 46%, #d9f0f2 100%);
         background-size: 48px 48px, 48px 48px, auto, auto;
     }
     .block-container {
-        max-width: 1220px;
-        padding-top: 54px;
-        padding-bottom: 44px;
+        max-width: 1240px;
+        padding: 34px 28px 44px 28px;
     }
     .portal-topbar {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        margin-bottom: 28px;
+        margin-bottom: 24px;
     }
     .portal-brand {
         display: flex;
         align-items: center;
         gap: 14px;
         color: #08213f;
-        font-size: 21px;
+        font-size: 22px;
         font-weight: 800;
     }
     .portal-mark {
-        width: 46px;
-        height: 46px;
+        width: 44px;
+        height: 44px;
         border-radius: 12px;
         background: linear-gradient(135deg, #1565c0, #009688);
         box-shadow: 0 18px 34px rgba(0, 96, 120, .18);
@@ -65,25 +64,48 @@ st.markdown(
         color: #29445f;
         font-size: 15px;
     }
-    .portal-card {
+    .portal-hero {
         border: 1px solid rgba(143, 172, 205, .48);
-        border-radius: 24px;
-        background: rgba(255,255,255,.88);
-        padding: 34px;
+        border-radius: 22px;
+        background:
+            radial-gradient(circle at 92% 16%, rgba(15,118,110,.10), transparent 34%),
+            rgba(255,255,255,.90);
+        padding: 34px 36px;
+        margin-bottom: 22px;
         box-shadow: 0 22px 58px rgba(8, 33, 63, .10);
     }
-    .portal-card h1 {
-        margin: 0 0 24px 0;
+    .portal-hero h1 {
+        margin: 0 0 10px 0;
         color: #08213f;
-        font-size: 34px;
+        font-size: 36px;
+        line-height: 1.12;
         letter-spacing: 0;
+    }
+    .portal-hero p {
+        max-width: 780px;
+        margin: 0;
+        color: #526a84;
+        font-size: 17px;
+        line-height: 1.7;
     }
     div[data-testid="column"] {
         border: 1px solid #d6e4f2;
         border-radius: 20px;
         background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-        padding: 26px 28px 24px 28px;
-        min-height: 230px;
+        padding: 28px 30px 26px 30px;
+        min-height: 245px;
+        box-shadow: 0 16px 42px rgba(8, 33, 63, .08);
+    }
+    div[data-testid="column"] h3 {
+        color: #08213f;
+        font-size: 28px;
+        line-height: 1.25;
+        margin-bottom: 14px;
+    }
+    div[data-testid="column"] p {
+        color: #526a84;
+        font-size: 16px;
+        line-height: 1.65;
     }
     .stButton > button {
         width: 100%;
@@ -94,6 +116,13 @@ st.markdown(
         color: #fff;
         font-size: 18px;
         font-weight: 800;
+        margin-top: 24px;
+        box-shadow: 0 12px 28px rgba(15,118,110,.18);
+    }
+    .stButton > button:hover {
+        background: #0b625c;
+        color: #fff;
+        border: 0;
     }
     .viewer-title {
         display: flex;
@@ -113,7 +142,8 @@ st.markdown(
         .block-container { padding: 28px 18px; }
         .portal-topbar { display: block; }
         .portal-note { margin-top: 12px; }
-        .portal-card { padding: 22px; }
+        .portal-hero { padding: 24px; }
+        .portal-hero h1 { font-size: 30px; }
     }
     </style>
     """,
@@ -145,9 +175,12 @@ def render_portal() -> None:
         f"""
         <div class="portal-topbar">
             <div class="portal-brand"><div class="portal-mark"></div><div>{APP_TITLE}</div></div>
-            <div class="portal-note">Streamlit 托管 · 两份 HTML 整合入口</div>
+            <div class="portal-note">两份 HTML 看板 · Streamlit 在线入口</div>
         </div>
-        <div class="portal-card"><h1>选择看板</h1></div>
+        <div class="portal-hero">
+            <h1>选择看板</h1>
+            <p>把年度销售贡献和同比变化集中到一个入口。选择下方看板后，会在当前页面直接打开对应分析。</p>
+        </div>
         """,
         unsafe_allow_html=True,
     )
