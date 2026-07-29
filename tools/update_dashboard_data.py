@@ -188,13 +188,22 @@ def has_delete_marker(*values: Any) -> bool:
     return any(DELETE_MARKER in clean_str(value) for value in values)
 
 
+def office_3005_mask(df: pd.DataFrame) -> pd.Series:
+    if "列1" in df.columns:
+        office = df["列1"].map(clean_code)
+    elif "销售办事处" in df.columns:
+        office = df["销售办事处"].map(clean_code)
+    else:
+        return pd.Series(False, index=df.index)
+    return office.str.startswith("3005", na=False)
+
+
 def filter_2026(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, Any]]:
     code = df["物料号"].map(clean_code)
-    office = df["列1"].map(clean_code) if "列1" in df.columns else df["销售办事处"].map(clean_code)
     delete_mask = df.apply(lambda row: has_delete_marker(row.get("物料描述"), row.get("品类"), row.get("品项")), axis=1)
     fake_mask = code.isin(BAD_CODES) | delete_mask
-    office_3005_mask = office.str.startswith("3005", na=False)
-    kept = df[~fake_mask & ~office_3005_mask].copy()
+    office_mask = office_3005_mask(df)
+    kept = df[~fake_mask & ~office_mask].copy()
     return kept, {
         "raw_rows": int(len(df)),
         "kept_gross_income_k": k(kept["销售额"].map(num).sum()),
@@ -202,10 +211,10 @@ def filter_2026(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, Any]]:
         "excluded_fake_product_income_k": k(df.loc[fake_mask, "销售收入"].map(num).sum()),
         "excluded_fake_product_net_margin_k": k(df.loc[fake_mask, "扣除折让运费净边贡"].map(num).sum()),
         "excluded_fake_product_volume_ton": k(df.loc[fake_mask, "销量KG"].map(num).sum()),
-        "excluded_3005_rows": int((~fake_mask & office_3005_mask).sum()),
-        "excluded_3005_income_k": k(df.loc[~fake_mask & office_3005_mask, "销售收入"].map(num).sum()),
-        "excluded_3005_net_margin_k": k(df.loc[~fake_mask & office_3005_mask, "扣除折让运费净边贡"].map(num).sum()),
-        "excluded_3005_volume_ton": k(df.loc[~fake_mask & office_3005_mask, "销量KG"].map(num).sum()),
+        "excluded_3005_rows": int((~fake_mask & office_mask).sum()),
+        "excluded_3005_income_k": k(df.loc[~fake_mask & office_mask, "销售收入"].map(num).sum()),
+        "excluded_3005_net_margin_k": k(df.loc[~fake_mask & office_mask, "扣除折让运费净边贡"].map(num).sum()),
+        "excluded_3005_volume_ton": k(df.loc[~fake_mask & office_mask, "销量KG"].map(num).sum()),
     }
 
 
@@ -213,13 +222,18 @@ def filter_2025(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, Any]]:
     code = df["物料号"].map(clean_code)
     delete_mask = df.apply(lambda row: has_delete_marker(row.get("物料描述"), row.get("品类"), row.get("品项")), axis=1)
     fake_mask = code.isin(BAD_CODES) | delete_mask
-    kept = df[~fake_mask].copy()
+    office_mask = office_3005_mask(df)
+    kept = df[~fake_mask & ~office_mask].copy()
     return kept, {
         "raw_rows": int(len(df)),
         "excluded_fake_product_rows": int(fake_mask.sum()),
         "excluded_fake_product_income_k": k(df.loc[fake_mask, "销售收入"].map(num).sum()),
         "excluded_fake_product_net_margin_k": k(df.loc[fake_mask, "扣除折让运费的净边贡"].map(num).sum()),
         "excluded_fake_product_volume_ton": k(df.loc[fake_mask, "销量KG"].map(num).sum()),
+        "excluded_3005_rows": int((~fake_mask & office_mask).sum()),
+        "excluded_3005_income_k": k(df.loc[~fake_mask & office_mask, "销售收入"].map(num).sum()),
+        "excluded_3005_net_margin_k": k(df.loc[~fake_mask & office_mask, "扣除折让运费的净边贡"].map(num).sum()),
+        "excluded_3005_volume_ton": k(df.loc[~fake_mask & office_mask, "销量KG"].map(num).sum()),
     }
 
 
@@ -442,11 +456,19 @@ def update_quality_yoy(data: dict[str, Any], records: list[dict[str, Any]], sour
     quality["excluded_fake_product_income_k_2025"] = stats_2025["excluded_fake_product_income_k"]
     quality["excluded_fake_product_net_margin_k_2025"] = stats_2025["excluded_fake_product_net_margin_k"]
     quality["excluded_fake_product_volume_ton_2025"] = stats_2025["excluded_fake_product_volume_ton"]
+    quality["excluded_3005_rows_2025"] = stats_2025["excluded_3005_rows"]
+    quality["excluded_3005_income_k_2025"] = stats_2025["excluded_3005_income_k"]
+    quality["excluded_3005_net_margin_k_2025"] = stats_2025["excluded_3005_net_margin_k"]
+    quality["excluded_3005_volume_ton_2025"] = stats_2025["excluded_3005_volume_ton"]
     quality["raw_rows_2026"] = stats_2026["raw_rows"]
     quality["excluded_fake_product_rows_2026"] = stats_2026["excluded_fake_product_rows"]
     quality["excluded_fake_product_income_k_2026"] = stats_2026["excluded_fake_product_income_k"]
     quality["excluded_fake_product_net_margin_k_2026"] = stats_2026["excluded_fake_product_net_margin_k"]
     quality["excluded_fake_product_volume_ton_2026"] = stats_2026["excluded_fake_product_volume_ton"]
+    quality["excluded_3005_rows_2026"] = stats_2026["excluded_3005_rows"]
+    quality["excluded_3005_income_k_2026"] = stats_2026["excluded_3005_income_k"]
+    quality["excluded_3005_net_margin_k_2026"] = stats_2026["excluded_3005_net_margin_k"]
+    quality["excluded_3005_volume_ton_2026"] = stats_2026["excluded_3005_volume_ton"]
     quality["excluded_3005_rows"] = stats_2026["excluded_3005_rows"]
     quality["excluded_3005_income_k"] = stats_2026["excluded_3005_income_k"]
     quality["excluded_3005_net_margin_k"] = stats_2026["excluded_3005_net_margin_k"]
