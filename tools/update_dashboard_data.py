@@ -361,12 +361,15 @@ def aggregate_yoy(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def totals(records: list[dict[str, Any]]) -> dict[str, float]:
     volume = sum(float(record.get("v") or 0) for record in records)
     income = sum(float(record.get("inc") or 0) for record in records)
+    allocated_discount = sum(float(record.get("ad") or 0) for record in records)
     net_margin = sum(float(record.get("nm") or 0) for record in records)
+    net_margin_base = income - allocated_discount
     return {
         "volume_ton": round(volume, 6),
         "income_k": round(income, 6),
+        "net_margin_base_k": round(net_margin_base, 6),
         "net_margin_k": round(net_margin, 6),
-        "net_margin_rate": net_margin / income if income else 0.0,
+        "net_margin_rate": net_margin / net_margin_base if net_margin_base else 0.0,
     }
 
 
@@ -384,12 +387,16 @@ def update_quality_sales(data: dict[str, Any], records: list[dict[str, Any]], so
     quality["channel_cnt"] = len({record["ch"] for record in records if record.get("ch")})
     total_volume = sum(float(record.get("v") or 0) for record in records)
     total_income = sum(float(record.get("inc") or 0) for record in records)
+    total_allocated_discount = sum(float(record.get("ad") or 0) for record in records)
     total_net_margin = sum(float(record.get("nm") or 0) for record in records)
+    total_net_margin_base = total_income - total_allocated_discount
     quality["total_volume_ton"] = round(total_volume, 6)
     quality["total_gross_income_k"] = round(total_income, 6)
     quality["total_income_k"] = round(total_income, 6)
+    quality["total_allocated_discount_k"] = round(total_allocated_discount, 6)
+    quality["total_net_margin_base_k"] = round(total_net_margin_base, 6)
     quality["total_net_margin_k"] = round(total_net_margin, 6)
-    quality["net_margin_rate"] = total_net_margin / total_income if total_income else 0.0
+    quality["net_margin_rate"] = total_net_margin / total_net_margin_base if total_net_margin_base else 0.0
     quality["excluded_fake_product_rows"] = stats_2026["excluded_fake_product_rows"]
     quality["excluded_fake_product_income_k"] = stats_2026["excluded_fake_product_income_k"]
     quality["excluded_fake_product_volume_ton"] = stats_2026["excluded_fake_product_volume_ton"]
