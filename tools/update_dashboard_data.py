@@ -208,11 +208,11 @@ def filter_2026(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, Any]]:
         "raw_rows": int(len(df)),
         "kept_gross_income_k": k(kept["销售额"].map(num).sum()),
         "excluded_fake_product_rows": int(fake_mask.sum()),
-        "excluded_fake_product_income_k": k(df.loc[fake_mask, "销售收入"].map(num).sum()),
+        "excluded_fake_product_income_k": k(df.loc[fake_mask, "销售额"].map(num).sum()),
         "excluded_fake_product_net_margin_k": k(df.loc[fake_mask, "扣除折让运费净边贡"].map(num).sum()),
         "excluded_fake_product_volume_ton": k(df.loc[fake_mask, "销量KG"].map(num).sum()),
         "excluded_3005_rows": int((~fake_mask & office_mask).sum()),
-        "excluded_3005_income_k": k(df.loc[~fake_mask & office_mask, "销售收入"].map(num).sum()),
+        "excluded_3005_income_k": k(df.loc[~fake_mask & office_mask, "销售额"].map(num).sum()),
         "excluded_3005_net_margin_k": k(df.loc[~fake_mask & office_mask, "扣除折让运费净边贡"].map(num).sum()),
         "excluded_3005_volume_ton": k(df.loc[~fake_mask & office_mask, "销量KG"].map(num).sum()),
     }
@@ -227,11 +227,11 @@ def filter_2025(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, Any]]:
     return kept, {
         "raw_rows": int(len(df)),
         "excluded_fake_product_rows": int(fake_mask.sum()),
-        "excluded_fake_product_income_k": k(df.loc[fake_mask, "销售收入"].map(num).sum()),
+        "excluded_fake_product_income_k": k(df.loc[fake_mask, "销售额"].map(num).sum()),
         "excluded_fake_product_net_margin_k": k(df.loc[fake_mask, "扣除折让运费的净边贡"].map(num).sum()),
         "excluded_fake_product_volume_ton": k(df.loc[fake_mask, "销量KG"].map(num).sum()),
         "excluded_3005_rows": int((~fake_mask & office_mask).sum()),
-        "excluded_3005_income_k": k(df.loc[~fake_mask & office_mask, "销售收入"].map(num).sum()),
+        "excluded_3005_income_k": k(df.loc[~fake_mask & office_mask, "销售额"].map(num).sum()),
         "excluded_3005_net_margin_k": k(df.loc[~fake_mask & office_mask, "扣除折让运费的净边贡"].map(num).sum()),
         "excluded_3005_volume_ton": k(df.loc[~fake_mask & office_mask, "销量KG"].map(num).sum()),
     }
@@ -285,12 +285,13 @@ def build_sales_records(df: pd.DataFrame, context: dict[str, Any]) -> list[dict[
             "cat": clean_str(row.get("品类")),
             "item": clean_str(row.get("品项")),
             "v": k(num(row.get("销量KG"))),
-            "inc": k(num(row.get("销售收入"))),
+            "inc": k(num(row.get("销售额"))),
             "dt": k(num(row.get("返利"))),
             "am": k(num(row.get("实际出厂边贡"))),
             "fr": k(num(row.get("运费合计"))),
             "ad": k(num(row.get("分摊折让"))),
             "nm": k(num(row.get("扣除折让运费净边贡"))),
+            "ni": k(num(row.get("销售收入"))),
         })
     return records
 
@@ -317,9 +318,10 @@ def build_yoy_rows_2025(df: pd.DataFrame, context: dict[str, Any]) -> list[dict[
             "o": office,
             "src": 1,
             "v": k(num(row.get("销量KG"))),
-            "inc": k(num(row.get("销售收入"))),
+            "inc": k(num(row.get("销售额"))),
             "ad": k(num(row.get("分摊的折让"))),
             "nm": k(num(row.get("扣除折让运费的净边贡"))),
+            "ni": k(num(row.get("销售收入"))),
         })
     return records
 
@@ -346,9 +348,10 @@ def build_yoy_rows_2026(df: pd.DataFrame, context: dict[str, Any]) -> list[dict[
             "o": office,
             "src": 1,
             "v": k(num(row.get("销量KG"))),
-            "inc": k(num(row.get("销售收入"))),
+            "inc": k(num(row.get("销售额"))),
             "ad": k(num(row.get("分摊折让"))),
             "nm": k(num(row.get("扣除折让运费净边贡"))),
+            "ni": k(num(row.get("销售收入"))),
         })
     return records
 
@@ -360,19 +363,21 @@ def aggregate_yoy(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
         key = tuple(record[dim] for dim in dims)
         if key not in grouped:
             grouped[key] = {dim: record[dim] for dim in dims}
-            grouped[key].update({"src": 0, "v": 0.0, "inc": 0.0, "ad": 0.0, "nm": 0.0})
+            grouped[key].update({"src": 0, "v": 0.0, "inc": 0.0, "ad": 0.0, "nm": 0.0, "ni": 0.0})
         target = grouped[key]
         target["src"] += int(record.get("src") or 1)
         target["v"] += float(record.get("v") or 0)
         target["inc"] += float(record.get("inc") or 0)
         target["ad"] += float(record.get("ad") or 0)
         target["nm"] += float(record.get("nm") or 0)
+        target["ni"] += float(record.get("ni") or 0)
     result = list(grouped.values())
     for record in result:
         record["v"] = round(record["v"], 6)
         record["inc"] = round(record["inc"], 6)
         record["ad"] = round(record["ad"], 6)
         record["nm"] = round(record["nm"], 6)
+        record["ni"] = round(record["ni"], 6)
     result.sort(key=lambda item: (item["y"], item["mo"], item["cat"], item["item"], item["ch"], item["p"], item["ct"], item["mcid"], item["pc"], item["o"]))
     return result
 
@@ -380,12 +385,14 @@ def aggregate_yoy(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def totals(records: list[dict[str, Any]]) -> dict[str, float]:
     volume = sum(float(record.get("v") or 0) for record in records)
     income = sum(float(record.get("inc") or 0) for record in records)
+    net_income = sum(float(record.get("ni") or 0) for record in records)
     allocated_discount = sum(float(record.get("ad") or 0) for record in records)
     net_margin = sum(float(record.get("nm") or 0) for record in records)
-    net_margin_base = income - allocated_discount
+    net_margin_base = net_income - allocated_discount
     return {
         "volume_ton": round(volume, 6),
         "income_k": round(income, 6),
+        "net_income_k": round(net_income, 6),
         "allocated_discount_k": round(allocated_discount, 6),
         "net_margin_base_k": round(net_margin_base, 6),
         "net_margin_k": round(net_margin, 6),
@@ -397,9 +404,10 @@ def update_quality_sales(data: dict[str, Any], records: list[dict[str, Any]], so
     quality = data.setdefault("quality", {})
     quality["period"] = "2026.01-2026.06"
     quality["source"] = str(source_2026)
-    quality["income_metric_source"] = "销售收入（未税收入）"
-    quality["gross_income_metric_source"] = "销售额（含税销额，仅作参考）"
+    quality["income_metric_source"] = "销售额（含税销额）"
+    quality["gross_income_metric_source"] = "销售额（含税销额）"
     quality["net_margin_rate_formula"] = "扣除折让运费后的净边贡 / (销售收入 - 分摊后折让)"
+    quality["net_income_metric_source"] = "销售收入（未税收入）"
     quality["rows"] = len(records)
     quality["month_order"] = ["2026.01", "2026.02", "2026.03", "2026.04", "2026.05", "2026.06"]
     quality["sku_cnt"] = len({record["pc"] for record in records if record.get("pc")})
@@ -410,12 +418,14 @@ def update_quality_sales(data: dict[str, Any], records: list[dict[str, Any]], so
     quality["channel_cnt"] = len({record["ch"] for record in records if record.get("ch")})
     total_volume = sum(float(record.get("v") or 0) for record in records)
     total_income = sum(float(record.get("inc") or 0) for record in records)
+    total_net_income = sum(float(record.get("ni") or 0) for record in records)
     total_allocated_discount = sum(float(record.get("ad") or 0) for record in records)
     total_net_margin = sum(float(record.get("nm") or 0) for record in records)
-    total_net_margin_base = total_income - total_allocated_discount
+    total_net_margin_base = total_net_income - total_allocated_discount
     quality["total_volume_ton"] = round(total_volume, 6)
     quality["total_gross_income_k"] = stats_2026["kept_gross_income_k"]
     quality["total_income_k"] = round(total_income, 6)
+    quality["total_net_income_k"] = round(total_net_income, 6)
     quality["total_allocated_discount_k"] = round(total_allocated_discount, 6)
     quality["total_net_margin_base_k"] = round(total_net_margin_base, 6)
     quality["total_net_margin_k"] = round(total_net_margin, 6)
@@ -435,16 +445,18 @@ def update_quality_yoy(data: dict[str, Any], records: list[dict[str, Any]], sour
     quality = data.setdefault("quality", {})
     quality["source_2025"] = str(source_2025)
     quality["source_2026"] = str(source_2026)
-    quality["income_metric_source_2026"] = "销售收入（未税收入）"
-    quality["income_metric_source_2025"] = "销售收入（未税收入）"
-    quality["gross_income_metric_source_2026"] = "销售额（含税销额，仅作参考）"
-    quality["gross_income_metric_source_2025"] = "销售额（含税销额，仅作参考）"
+    quality["income_metric_source_2026"] = "销售额（含税销额）"
+    quality["income_metric_source_2025"] = "销售额（含税销额）"
+    quality["gross_income_metric_source_2026"] = "销售额（含税销额）"
+    quality["gross_income_metric_source_2025"] = "销售额（含税销额）"
     quality["net_margin_rate_formula"] = "扣除折让运费后的净边贡 / (销售收入 - 分摊后折让)"
     column_map = quality.setdefault("metric_column_map", {})
-    column_map.setdefault("2026", {})["income"] = "销售收入 / 1000（未税收入）"
-    column_map.setdefault("2026", {})["gross_income"] = "销售额 / 1000（含税销额，仅作参考）"
-    column_map.setdefault("2025", {})["income"] = "销售收入 / 1000（未税收入）"
-    column_map.setdefault("2025", {})["gross_income"] = "销售额 / 1000（含税销额，仅作参考）"
+    column_map.setdefault("2026", {})["income"] = "销售额 / 1000（含税销额）"
+    column_map.setdefault("2026", {})["gross_income"] = "销售额 / 1000（含税销额）"
+    column_map.setdefault("2026", {})["net_income"] = "销售收入 / 1000（未税收入，用于净边贡率分母）"
+    column_map.setdefault("2025", {})["income"] = "销售额 / 1000（含税销额）"
+    column_map.setdefault("2025", {})["gross_income"] = "销售额 / 1000（含税销额）"
+    column_map.setdefault("2025", {})["net_income"] = "销售收入 / 1000（未税收入，用于净边贡率分母）"
     quality["aggregated_rows"] = len(records)
     quality["category_cnt"] = len({record["cat"] for record in records if record.get("cat")})
     quality["totals"] = {
