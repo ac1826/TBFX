@@ -4,6 +4,7 @@ import json
 import math
 import re
 import shutil
+import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
@@ -17,13 +18,40 @@ SALES_STATIC = STATIC_DIR / "2026-sales-dashboard.html"
 YOY_STATIC = STATIC_DIR / "2026-vs-2025-yoy-dashboard.html"
 
 F_DIR = Path("F:/llqdocument/大成文件/客户贡献分析")
-SOURCE_2026_NAME = "PFS 26年毛利表1-6月 含电商 TOP20新.xlsx"
-SOURCE_2025_NAME = "PFS 25年毛利表1-6月 含电商 TOP20 -品项实际 -新.xlsx"
-SALES_SOURCE_HTML = F_DIR / "2026年1-6月数据分析仪表盘.html"
-YOY_SOURCE_HTML = F_DIR / "26年与25年_1-6月数据对比分析.html"
+SOURCE_2026_NAME = "PFS 26年毛利表1-7月 含电商 TOP20新.xlsx"
+SOURCE_2025_NAME = "PFS 25年毛利表1-7月 含电商 TOP20 -品项实际 新.xlsx"
+CUSTOMER_MASTER_NAME = "7月客户渠道及合并汇总.xlsx"
+CHANNEL_CLASSIFICATION_NAME = "渠道分类.xlsx"
+ORG_MASTER_NAME = "销售办事处组织架构及渠道.xlsx"
+CUSTOMER_LIST_NAME = "客户清单.xlsx"
+REFERENCE_HTML_NAME = "2026年1-6月主次渠道分析仪表盘.html"
+SALES_SOURCE_HTML = F_DIR / "2026年1-7月数据分析仪表盘.html"
+YOY_SOURCE_HTML = F_DIR / "26年与25年_1-7月数据对比分析.html"
 
 BAD_CODES = {"CA2428001", "CC1131011"}
 DELETE_MARKER = "删"
+UNMAPPED = "未映射"
+UNMAPPED_OUTPUT = F_DIR / "未映射明细.xlsx"
+
+# Explicit location supplements confirmed from public company/government records.
+# These are keyed by customer ID; office names are never used to infer geography.
+RESEARCHED_GEO: dict[str, dict[str, str]] = {
+    "GBR0000": {"p": "香港特别行政区", "ct": "中国香港", "source": "用户明确规则"},
+    "274055": {"p": "广东省", "ct": "东莞", "source": "https://www.evirthfood.com/news.html"},
+    "GW15": {"p": "辽宁省", "ct": "大连", "source": "https://www.dfa3999.com/sc/responsibility_news_details.php?id=36"},
+    "299149": {"p": "广东省", "ct": "广州", "source": "https://www.gz.gov.cn/attachment/7/7972/7972121/10684809.pdf"},
+    "262906": {"p": "河南省", "ct": "南阳", "source": "客户完整工商名称（南阳市天禄商贸有限公司）"},
+    "262907": {"p": "江西省", "source": "客户完整工商名称（江西特源贸易有限公司）"},
+    "262908": {"p": "河南省", "ct": "漯河", "source": "客户完整工商名称（漯河元粒食品有限公司）"},
+    "274620": {"p": "江苏省", "ct": "昆山", "source": "https://m.zhipin.com/companys/061ebf4222b1ee0f03x73tW-GVI~.html"},
+    "274732": {"p": "甘肃省", "ct": "庆阳", "source": "https://www.shuididp.cn/yp-21fa6738f82d709caa3d2daf0fb5a001.html"},
+    "274740": {"p": "云南省", "source": "客户完整工商名称（云南吉满福供应链管理有限公司）"},
+    "275929": {"p": "广东省", "source": "客户完整工商名称（广东唐馆食品有限公司）"},
+    "275930": {"p": "海南省", "source": "客户完整工商名称（海南蓝天浩瀚食品有限公司）"},
+    "275932": {"p": "广东省", "ct": "汕尾", "source": "客户完整工商名称（陆丰市甲子镇炜灿食品）"},
+    "275933": {"p": "广东省", "ct": "佛山", "source": "https://www.qiyeku.cn/b2b/4705594.html"},
+    "285002": {"p": "山东省", "ct": "德州", "source": "https://static1.tianyancha.com/companyHonorLabel/gov-notice/file/edaeb37bc25ae80fccf6b6bbdad0ea87.pdf"},
+}
 
 
 def find_source_file(name: str) -> Path:
@@ -167,17 +195,210 @@ def most_common_lookup(records: list[dict[str, Any]], key: str, fields: tuple[st
     return {item_key: dict(zip(fields, counter.most_common(1)[0][0])) for item_key, counter in buckets.items()}
 
 
-def build_lookup_context(sales_data: dict[str, Any], yoy_data: dict[str, Any]) -> dict[str, Any]:
-    sales_records = sales_data.get("records", [])
-    yoy_records = yoy_data.get("records", [])
-    return {
-        "sales_customer": most_common_lookup(sales_records, "cid", ("p", "ct", "ch", "nr", "mcid", "mcn")),
-        "sales_customer_name": most_common_lookup(sales_records, "cn", ("p", "ct", "ch", "nr", "mcid", "mcn")),
-        "sales_office": most_common_lookup(sales_records, "o", ("ch", "nr")),
-        "yoy_customer": most_common_lookup(yoy_records, "mcid", ("p", "ct", "ch")),
-        "yoy_customer_name": most_common_lookup(yoy_records, "mcn", ("p", "ct", "ch")),
-        "yoy_office": most_common_lookup(yoy_records, "o", ("ch",)),
+PROVINCE_NAMES = (
+    "内蒙古", "黑龙江", "北京", "天津", "上海", "重庆", "河北", "山西", "辽宁", "吉林",
+    "江苏", "浙江", "安徽", "福建", "江西", "山东", "河南", "湖北", "湖南", "广东",
+    "广西", "海南", "四川", "贵州", "云南", "西藏", "陕西", "甘肃", "青海", "宁夏", "新疆",
+    "台湾", "香港", "澳门",
+)
+MUNICIPALITIES = {"北京", "天津", "上海", "重庆"}
+AUTONOMOUS_REGIONS = {"内蒙古": "内蒙古自治区", "广西": "广西壮族自治区", "西藏": "西藏自治区", "宁夏": "宁夏回族自治区", "新疆": "新疆维吾尔自治区"}
+
+
+def province_from_sales_region(value: Any) -> str:
+    """Read a province only when it is explicitly named in the sales-region field."""
+    text = clean_str(value).replace(" ", "")
+    for name in PROVINCE_NAMES:
+        if text.startswith(name):
+            if name in MUNICIPALITIES:
+                return f"{name}市"
+            return AUTONOMOUS_REGIONS.get(name, f"{name}省")
+    return ""
+
+
+def city_aliases(value: Any) -> set[str]:
+    """Build conservative aliases for an explicitly supplied city/district name."""
+    text = clean_str(value).replace(" ", "")
+    if not text:
+        return set()
+    aliases = {text}
+    for province in PROVINCE_NAMES:
+        if text.startswith(province) and len(text) > len(province):
+            aliases.add(text[len(province):])
+    for suffix in ("市区", "地区", "自治州", "盟", "市", "县", "区"):
+        for alias in list(aliases):
+            if alias.endswith(suffix) and len(alias) > len(suffix):
+                aliases.add(alias[:-len(suffix)])
+    return {alias for alias in aliases if len(alias) >= 2}
+
+
+def load_org_customer_supplements(path: Path) -> tuple[dict[str, dict[str, str]], dict[str, str]]:
+    relationships = pd.read_excel(path, sheet_name="客户对应关系", header=1, engine="openpyxl")
+    customers: dict[str, dict[str, str]] = {}
+    for row in relationships.to_dict("records"):
+        customer = clean_code(row.get("售达方"))
+        if not customer:
+            continue
+        customers[customer] = {
+            "channel": clean_str(row.get("渠道")),
+            "region": clean_str(row.get("大区")),
+            "city": clean_str(row.get("城市")),
+        }
+
+    cities = pd.read_excel(path, sheet_name="城市", engine="openpyxl")
+    code_to_province: dict[str, str] = {}
+    current_province = ""
+    for row in cities.to_dict("records"):
+        code = clean_code(row.get("SDst"))
+        name = clean_str(row.get("地区名字"))
+        if not code or not name:
+            continue
+        if code.endswith("0000") and "省级" in name:
+            current_province = province_from_sales_region(name.replace("(省级)", ""))
+        if current_province:
+            code_to_province[code] = current_province
+    alias_votes: dict[str, set[str]] = {}
+    for row in cities.to_dict("records"):
+        province = code_to_province.get(clean_code(row.get("SDst")), "")
+        if not province:
+            continue
+        for alias in city_aliases(row.get("地区名字")):
+            alias_votes.setdefault(alias, set()).add(province)
+    # Only retain aliases that identify exactly one province; ambiguous names are not guessed.
+    sales_region_to_province = {
+        alias: next(iter(provinces))
+        for alias, provinces in alias_votes.items()
+        if len(provinces) == 1
     }
+    return customers, sales_region_to_province
+
+
+def province_from_city(value: Any, city_to_province: dict[str, str]) -> str:
+    provinces = {
+        city_to_province[alias]
+        for alias in city_aliases(value)
+        if alias in city_to_province
+    }
+    return next(iter(provinces)) if len(provinces) == 1 else ""
+
+
+def load_reference_html_maps(path: Path) -> dict[str, dict[str, str]]:
+    """Read only unambiguous customer-ID mappings explicitly embedded in the reference dashboard."""
+    if not path.exists():
+        return {}
+    _, _, data = extract_app_data(path.read_text(encoding="utf-8"))
+    votes: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
+    for row in data.get("records", []):
+        customer = clean_code(row.get("cid"))
+        if not customer:
+            continue
+        for field in ("mcid", "mcn", "ch", "p", "ct", "nr"):
+            value = clean_str(row.get(field))
+            if value and value not in {UNMAPPED, "未识别省份"}:
+                votes[customer][field].add(value)
+    return {
+        customer: {
+            field: next(iter(values))
+            for field, values in fields.items()
+            if len(values) == 1
+        }
+        for customer, fields in votes.items()
+    }
+
+
+def build_lookup_context() -> dict[str, Any]:
+    profitability_root = REPO_ROOT.parent / "pfs-profitability-dashboard"
+    sys.path.insert(0, str(profitability_root))
+    from src.pipeline import build_strict_dimension_maps
+
+    canonical_channel, canonical_region = build_strict_dimension_maps(
+        F_DIR / ORG_MASTER_NAME,
+        F_DIR / CUSTOMER_MASTER_NAME,
+        channel_classification_files=[F_DIR / CHANNEL_CLASSIFICATION_NAME, F_DIR / CUSTOMER_LIST_NAME],
+    )
+    org_customers, org_sales_region_provinces = load_org_customer_supplements(F_DIR / ORG_MASTER_NAME)
+    reference_maps = load_reference_html_maps(F_DIR / REFERENCE_HTML_NAME)
+    classification = pd.read_excel(F_DIR / CHANNEL_CLASSIFICATION_NAME, engine="openpyxl")
+    canonical_geo: dict[str, dict[str, str]] = {}
+    sales_regions: dict[str, str] = {}
+    for row in classification.to_dict("records"):
+        customer = clean_code(row.get("客户"))
+        if not customer:
+            continue
+        city = clean_str(row.get("Unnamed: 28")) or clean_str(row.get("城市"))
+        sales_region = clean_str(row.get("销售地区"))
+        province = province_from_sales_region(sales_region) or org_sales_region_provinces.get(sales_region, "")
+        geo = canonical_geo.setdefault(customer, {})
+        if city and not geo.get("ct"):
+            geo["ct"] = city
+        if province and not geo.get("p"):
+            geo["p"] = province
+        if sales_region and customer not in sales_regions:
+            sales_regions[customer] = sales_region
+
+    customer_base = pd.read_excel(
+        F_DIR / CUSTOMER_MASTER_NAME,
+        sheet_name="基础2渠道类型",
+        engine="openpyxl",
+    )
+    customer_names = {
+        clean_code(row.get("客户")): clean_str(row.get("客户名称"))
+        for row in customer_base.to_dict("records")
+        if clean_code(row.get("客户"))
+    }
+    customer_cities = {
+        clean_code(row.get("客户")): clean_str(row.get("城市"))
+        for row in customer_base.to_dict("records")
+        if clean_code(row.get("客户")) and clean_str(row.get("城市"))
+    }
+    merge_sheet = pd.read_excel(
+        F_DIR / CUSTOMER_MASTER_NAME,
+        sheet_name="基础3客户合并",
+        engine="openpyxl",
+    )
+    merged_customers = {
+        clean_code(row.get("客户编码")): clean_code(row.get("合并-促销"))
+        for row in merge_sheet.to_dict("records")
+        if clean_code(row.get("客户编码")) and clean_code(row.get("合并-促销"))
+    }
+    # Search the whole customer master by exact customer ID. For customers with an
+    # explicit promotion merge, the merged customer's city is an allowed fallback.
+    for customer, city in customer_cities.items():
+        geo = canonical_geo.setdefault(customer, {})
+        if city and not geo.get("ct"):
+            geo["ct"] = city
+        province = province_from_city(city, org_sales_region_provinces)
+        if province and not geo.get("p"):
+            geo["p"] = province
+    customer_list = pd.read_excel(F_DIR / CUSTOMER_LIST_NAME, engine="openpyxl")
+    listed_names = {
+        clean_code(row.get("客户")): clean_str(row.get("客户编号1"))
+        for row in customer_list.to_dict("records")
+        if clean_code(row.get("客户"))
+    }
+    listed_offices = {
+        clean_code(row.get("客户")): clean_code(row.get("SOff."))
+        for row in customer_list.to_dict("records")
+        if clean_code(row.get("客户")) and clean_code(row.get("SOff."))
+    }
+    return {
+        "canonical_channel": canonical_channel,
+        "canonical_region": canonical_region,
+        "canonical_geo": canonical_geo,
+        "customer_names": customer_names,
+        "customer_cities": customer_cities,
+        "merged_customers": merged_customers,
+        "listed_names": listed_names,
+        "listed_offices": listed_offices,
+        "sales_regions": sales_regions,
+        "org_customers": org_customers,
+        "reference_maps": reference_maps,
+    }
+
+
+def office_code(value: Any) -> str:
+    match = re.search(r"(?<!\d)(\d{4})(?!\d)", clean_str(value))
+    return match.group(1) if match else ""
 
 
 def read_workbook(path: Path, sheet: str) -> pd.DataFrame:
@@ -241,25 +462,50 @@ def enrich_sales(record: dict[str, Any], context: dict[str, Any]) -> dict[str, s
     cid = clean_code(record.get("客户编码"))
     cn = clean_str(record.get("客户描述"))
     office = clean_str(record.get("销售办事处"))
-    info = context["sales_customer"].get(cid) or context["sales_customer_name"].get(cn) or {}
-    office_info = context["sales_office"].get(office) or {}
+    geo = context["canonical_geo"].get(cid) or {}
+    org_customer = context["org_customers"].get(cid) or {}
+    reference = context["reference_maps"].get(cid) or {}
+    researched = RESEARCHED_GEO.get(cid) or {}
+    code = office_code(office)
+    listed_office_code = context["listed_offices"].get(cid, "")
+    region_code = code if context["canonical_region"].get(code) else listed_office_code
+    canonical_region = "华北区" if code == "7420" else context["canonical_region"].get(region_code, "")
+    merged_id = context["merged_customers"].get(cid) or reference.get("mcid") or cid
+    merged_geo = context["canonical_geo"].get(merged_id) or {}
+    merged_org_customer = context["org_customers"].get(merged_id) or {}
+    city = (
+        geo.get("ct")
+        or context["customer_cities"].get(cid)
+        or org_customer.get("city")
+        or merged_geo.get("ct")
+        or context["customer_cities"].get(merged_id)
+        or merged_org_customer.get("city")
+        or reference.get("ct")
+        or researched.get("ct")
+        or UNMAPPED
+    )
+    province = "山东省" if code == "7420" else geo.get("p") or merged_geo.get("p") or reference.get("p") or researched.get("p") or "未识别省份"
+    if code == "7420":
+        city = "德州"
+    region = canonical_region or UNMAPPED
     return {
-        "p": info.get("p", "未识别"),
-        "ct": info.get("ct", "未识别"),
-        "ch": info.get("ch") or office_info.get("ch", "未识别"),
-        "nr": info.get("nr") or office_info.get("nr", "未识别"),
-        "mcid": info.get("mcid") or cid,
-        "mcn": info.get("mcn") or cn,
+        "p": province,
+        "ct": city,
+        "ch": "KA" if code == "7420" else context["canonical_channel"].get(cid) or org_customer.get("channel") or reference.get("ch") or UNMAPPED,
+        "nr": region if region != UNMAPPED else org_customer.get("region") or reference.get("nr") or UNMAPPED,
+        "mcid": merged_id,
+        "mcn": context["customer_names"].get(merged_id) or context["listed_names"].get(merged_id) or reference.get("mcn") or (cn if merged_id == cid else UNMAPPED),
     }
 
 
 def enrich_yoy(customer_id: str, customer_name: str, office: str, context: dict[str, Any]) -> dict[str, str]:
-    info = context["yoy_customer"].get(customer_id) or context["yoy_customer_name"].get(customer_name) or {}
-    office_info = context["yoy_office"].get(office) or {}
+    enriched = enrich_sales({"客户编码": customer_id, "客户描述": customer_name, "销售办事处": office}, context)
     return {
-        "p": info.get("p", "未识别"),
-        "ct": info.get("ct", "未识别"),
-        "ch": info.get("ch") or office_info.get("ch", "未识别"),
+        "p": enriched["p"],
+        "ct": enriched["ct"],
+        "ch": enriched["ch"],
+        "mcid": enriched["mcid"],
+        "mcn": enriched["mcn"],
     }
 
 
@@ -311,8 +557,8 @@ def build_yoy_rows_2025(df: pd.DataFrame, context: dict[str, Any]) -> list[dict[
             "ch": enriched["ch"],
             "p": enriched["p"],
             "ct": enriched["ct"],
-            "mcid": customer_id,
-            "mcn": customer_name,
+            "mcid": enriched["mcid"],
+            "mcn": enriched["mcn"],
             "pc": clean_code(row.get("物料号")),
             "pn": clean_str(row.get("物料描述")),
             "o": office,
@@ -341,8 +587,8 @@ def build_yoy_rows_2026(df: pd.DataFrame, context: dict[str, Any]) -> list[dict[
             "ch": enriched["ch"],
             "p": enriched["p"],
             "ct": enriched["ct"],
-            "mcid": customer_id,
-            "mcn": customer_name,
+            "mcid": enriched["mcid"],
+            "mcn": enriched["mcn"],
             "pc": clean_code(row.get("物料号")),
             "pn": clean_str(row.get("物料描述")),
             "o": office,
@@ -400,16 +646,67 @@ def totals(records: list[dict[str, Any]]) -> dict[str, float]:
     }
 
 
+def build_unmapped_rows(df: pd.DataFrame, year: int, context: dict[str, Any]) -> list[dict[str, str]]:
+    output: dict[tuple[str, ...], dict[str, str]] = {}
+    for row in df.to_dict("records"):
+        customer_id = clean_code(row.get("客户编码"))
+        customer_name = clean_str(row.get("客户描述"))
+        office = clean_str(row.get("销售办事处"))
+        code = office_code(office)
+        enriched = enrich_sales(row, context)
+        missing: list[str] = []
+        if enriched["ch"] == UNMAPPED:
+            missing.append("渠道")
+        if customer_id in context["merged_customers"] and enriched["mcn"] == UNMAPPED:
+            missing.append("合并客户名称")
+        if enriched["ct"] == UNMAPPED:
+            missing.append("城市")
+        if enriched["p"] in {UNMAPPED, "未识别省份"}:
+            missing.append("省份")
+        if enriched["nr"] == UNMAPPED:
+            missing.append("大区")
+        if not missing:
+            continue
+        raw_month = clean_code(row.get("月份"))
+        month = int(raw_month[-2:]) if raw_month else 0
+        key = (str(year), str(month), customer_id, customer_name, office, "、".join(missing))
+        output[key] = {
+            "年份": str(year),
+            "来源月份": f"{year}-{month:02d}",
+            "客户编码": customer_id,
+            "客户名称": customer_name,
+            "销售办事处": office,
+            "销售地区": context["sales_regions"].get(customer_id, ""),
+            "缺失字段": "、".join(missing),
+        }
+    return list(output.values())
+
+
+def write_unmapped_report(rows: list[dict[str, str]]) -> None:
+    columns = ["年份", "来源月份", "客户编码", "客户名称", "销售办事处", "销售地区", "缺失字段"]
+    detail = pd.DataFrame(rows, columns=columns).sort_values(columns, kind="stable")
+    summary = (
+        detail.assign(缺失字段=detail["缺失字段"].str.split("、"))
+        .explode("缺失字段")
+        .groupby(["年份", "缺失字段"], dropna=False)
+        .size()
+        .reset_index(name="记录数")
+    )
+    with pd.ExcelWriter(UNMAPPED_OUTPUT, engine="openpyxl") as writer:
+        detail.to_excel(writer, sheet_name="未映射明细", index=False)
+        summary.to_excel(writer, sheet_name="汇总", index=False)
+
+
 def update_quality_sales(data: dict[str, Any], records: list[dict[str, Any]], source_2026: Path, stats_2026: dict[str, Any]) -> None:
     quality = data.setdefault("quality", {})
-    quality["period"] = "2026.01-2026.06"
+    quality["period"] = "2026.01-2026.07"
     quality["source"] = str(source_2026)
     quality["income_metric_source"] = "销售额（含税销额）"
     quality["gross_income_metric_source"] = "销售额（含税销额）"
     quality["net_margin_rate_formula"] = "扣除折让运费后的净边贡 / (销售收入 - 分摊后折让)"
     quality["net_income_metric_source"] = "销售收入（未税收入）"
     quality["rows"] = len(records)
-    quality["month_order"] = ["2026.01", "2026.02", "2026.03", "2026.04", "2026.05", "2026.06"]
+    quality["month_order"] = ["2026.01", "2026.02", "2026.03", "2026.04", "2026.05", "2026.06", "2026.07"]
     quality["sku_cnt"] = len({record["pc"] for record in records if record.get("pc")})
     quality["customer_cnt"] = len({record["cid"] for record in records if record.get("cid")})
     quality["merged_customer_cnt"] = len({record["mcid"] for record in records if record.get("mcid")})
@@ -491,18 +788,22 @@ def main() -> None:
     source_2026, source_2025 = copy_sources_to_f_dir()
     sales_data = load_app_data(SALES_STATIC)
     yoy_data = load_app_data(YOY_STATIC)
-    context = build_lookup_context(sales_data, yoy_data)
+    context = build_lookup_context()
 
     df_2026 = read_workbook(source_2026, "26")
     df_2025 = read_workbook(source_2025, "25")
     clean_2026, stats_2026 = filter_2026(df_2026)
     clean_2025, stats_2025 = filter_2025(df_2025)
 
+    unmapped_rows = build_unmapped_rows(clean_2025, 2025, context) + build_unmapped_rows(clean_2026, 2026, context)
+    write_unmapped_report(unmapped_rows)
+
     sales_records = build_sales_records(clean_2026, context)
     yoy_raw = build_yoy_rows_2025(clean_2025, context) + build_yoy_rows_2026(clean_2026, context)
     yoy_records = aggregate_yoy(yoy_raw)
 
     sales_data["records"] = sales_records
+    sales_data["monthOrder"] = ["2026.01", "2026.02", "2026.03", "2026.04", "2026.05", "2026.06", "2026.07"]
     update_quality_sales(sales_data, sales_records, source_2026, stats_2026)
     yoy_data["records"] = yoy_records
     update_quality_yoy(yoy_data, yoy_records, source_2025, source_2026, stats_2025, stats_2026)
@@ -522,6 +823,8 @@ def main() -> None:
         "yoy_totals": yoy_data["quality"]["totals"],
         "stats_2026": stats_2026,
         "stats_2025": stats_2025,
+        "unmapped_report": str(UNMAPPED_OUTPUT),
+        "unmapped_records": len(unmapped_rows),
     }, ensure_ascii=False, indent=2))
 
 
