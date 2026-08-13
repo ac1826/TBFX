@@ -10,7 +10,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 DASHBOARDS = {
     "sales": {
         "title": "2026年销售数据看板",
-        "description": "查看2026年1-6月客户、区域、渠道、品类和贡献表现。",
+        "description": "查看2026年1-7月客户、区域、渠道、品类和贡献表现。",
         "filename": "2026-sales-dashboard.html",
         "button_class": "sales",
     },
