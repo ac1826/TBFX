@@ -20,6 +20,8 @@ YOY_STATIC = STATIC_DIR / "2026-vs-2025-yoy-dashboard.html"
 F_DIR = Path("F:/llqdocument/大成文件/客户贡献分析")
 SOURCE_2026_NAME = "PFS 26年毛利表1-7月 含电商 TOP20新.xlsx"
 SOURCE_2025_NAME = "PFS 25年毛利表1-7月 含电商 TOP20 -品项实际 新.xlsx"
+YOY_MONTH_ORDER = [f"{month}月" for month in range(1, 8)]
+YOY_CHANNEL_ORDER = ["烘焙", "休闲", "团膳", "宴席", "零售", "KA", "电商", "其他"]
 CUSTOMER_MASTER_NAME = "7月客户渠道及合并汇总.xlsx"
 CHANNEL_CLASSIFICATION_NAME = "渠道分类.xlsx"
 ORG_MASTER_NAME = "销售办事处组织架构及渠道.xlsx"
@@ -173,14 +175,19 @@ def month_2026(value: Any) -> tuple[str, str]:
 
 
 def month_cn(value: Any, year: str) -> str:
-    raw = clean_str(value)
+    raw = clean_str(value).removesuffix("月").strip()
     if not raw:
         return ""
-    if raw.endswith("月"):
-        return raw
-    if raw.startswith("26") and len(raw) >= 4:
-        return f"{int(raw[-2:])}月"
-    return f"{int(float(raw))}月"
+    code = clean_code(raw)
+    if code.startswith(year) and len(code) >= 6:
+        month = int(code[-2:])
+    elif code.startswith(year[-2:]) and len(code) >= 4:
+        month = int(code[-2:])
+    else:
+        month = int(float(code))
+    if not 1 <= month <= 12:
+        raise ValueError(f"Invalid month value for {year}: {value}")
+    return f"{month}月"
 
 
 def most_common_lookup(records: list[dict[str, Any]], key: str, fields: tuple[str, ...]) -> dict[str, dict[str, str]]:
@@ -806,6 +813,8 @@ def main() -> None:
     sales_data["monthOrder"] = ["2026.01", "2026.02", "2026.03", "2026.04", "2026.05", "2026.06", "2026.07"]
     update_quality_sales(sales_data, sales_records, source_2026, stats_2026)
     yoy_data["records"] = yoy_records
+    yoy_data["monthOrder"] = YOY_MONTH_ORDER
+    yoy_data["channelOrder"] = YOY_CHANNEL_ORDER
     update_quality_yoy(yoy_data, yoy_records, source_2025, source_2026, stats_2025, stats_2026)
 
     for path, data in ((SALES_STATIC, sales_data), (YOY_STATIC, yoy_data)):
