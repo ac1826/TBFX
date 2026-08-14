@@ -21,7 +21,7 @@ F_DIR = Path("F:/llqdocument/大成文件/客户贡献分析")
 SOURCE_2026_NAME = "PFS 26年毛利表1-7月 含电商 TOP20新.xlsx"
 SOURCE_2025_NAME = "PFS 25年毛利表1-7月 含电商 TOP20 -品项实际 新.xlsx"
 YOY_MONTH_ORDER = [f"{month}月" for month in range(1, 8)]
-YOY_CHANNEL_ORDER = ["烘焙", "休闲", "团膳", "宴席", "零售", "KA", "电商", "其他"]
+YOY_CHANNEL_ORDER = ["烘焙", "休闲", "团膳", "宴席", "零售", "KA", "鲜食工厂", "其他"]
 CUSTOMER_MASTER_NAME = "7月客户渠道及合并汇总.xlsx"
 CHANNEL_CLASSIFICATION_NAME = "渠道分类.xlsx"
 ORG_MASTER_NAME = "销售办事处组织架构及渠道.xlsx"
@@ -811,6 +811,7 @@ def main() -> None:
 
     sales_data["records"] = sales_records
     sales_data["monthOrder"] = ["2026.01", "2026.02", "2026.03", "2026.04", "2026.05", "2026.06", "2026.07"]
+    sales_data["channelOrder"] = YOY_CHANNEL_ORDER
     update_quality_sales(sales_data, sales_records, source_2026, stats_2026)
     yoy_data["records"] = yoy_records
     yoy_data["monthOrder"] = YOY_MONTH_ORDER
