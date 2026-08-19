@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import math
 import re
@@ -9,6 +10,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
+import openpyxl
 import pandas as pd
 
 
@@ -313,16 +315,51 @@ def load_reference_html_maps(path: Path) -> dict[str, dict[str, str]]:
     }
 
 
-def build_lookup_context() -> dict[str, Any]:
+REGION_LABELS = {
+    "东北区", "华北区", "西北区", "西南区", "华中区", "华东区", "华南区", "烘焙南区",
+    "MKA", "RKA", "出口", "电商", "GKA", "BKA",
+}
+EXPLICIT_REGION_OVERRIDES = {"7363": "华北区"}
+
+
+def load_26_01_region_map(path: Path) -> dict[str, str]:
+    workbook = openpyxl.load_workbook(path, read_only=True, data_only=True, keep_links=False)
+    mapping: dict[str, str] = {}
+    try:
+        sheets = [ws for ws in workbook.worksheets if "26年1月" in ws.title]
+        if not sheets:
+            raise ValueError(f"{path} does not contain the 26年1月 sheet")
+        for ws in sheets:
+            current_region = ""
+            for row in ws.iter_rows(min_row=1, max_row=min(ws.max_row, 2000), values_only=True):
+                raw_region = clean_str(row[1] if len(row) > 1 else None).replace("大区", "区").replace("部门", "")
+                if raw_region in REGION_LABELS:
+                    current_region = raw_region
+                office = clean_str(row[2] if len(row) > 2 else None)
+                code = office_code(office)
+                if not code or not current_region:
+                    continue
+                previous = mapping.get(code)
+                if previous and previous != current_region:
+                    raise ValueError(f"Office {code} has conflicting regions: {previous} / {current_region}")
+                mapping[code] = current_region
+    finally:
+        workbook.close()
+    mapping.update(EXPLICIT_REGION_OVERRIDES)
+    return mapping
+
+
+def build_lookup_context(region_master: Path) -> dict[str, Any]:
     profitability_root = REPO_ROOT.parent / "pfs-profitability-dashboard"
     sys.path.insert(0, str(profitability_root))
     from src.pipeline import build_strict_dimension_maps
 
-    canonical_channel, canonical_region = build_strict_dimension_maps(
+    canonical_channel, _ = build_strict_dimension_maps(
         F_DIR / ORG_MASTER_NAME,
         F_DIR / CUSTOMER_MASTER_NAME,
         channel_classification_files=[F_DIR / CHANNEL_CLASSIFICATION_NAME, F_DIR / CUSTOMER_LIST_NAME],
     )
+    canonical_region = load_26_01_region_map(region_master)
     org_customers, org_sales_region_provinces = load_org_customer_supplements(F_DIR / ORG_MASTER_NAME)
     reference_maps = load_reference_html_maps(F_DIR / REFERENCE_HTML_NAME)
     classification = pd.read_excel(F_DIR / CHANNEL_CLASSIFICATION_NAME, engine="openpyxl")
@@ -474,9 +511,7 @@ def enrich_sales(record: dict[str, Any], context: dict[str, Any]) -> dict[str, s
     reference = context["reference_maps"].get(cid) or {}
     researched = RESEARCHED_GEO.get(cid) or {}
     code = office_code(office)
-    listed_office_code = context["listed_offices"].get(cid, "")
-    region_code = code if context["canonical_region"].get(code) else listed_office_code
-    canonical_region = "华北区" if code == "7420" else context["canonical_region"].get(region_code, "")
+    canonical_region = context["canonical_region"].get(code, "")
     merged_id = context["merged_customers"].get(cid) or reference.get("mcid") or cid
     merged_geo = context["canonical_geo"].get(merged_id) or {}
     merged_org_customer = context["org_customers"].get(merged_id) or {}
@@ -499,7 +534,7 @@ def enrich_sales(record: dict[str, Any], context: dict[str, Any]) -> dict[str, s
         "p": province,
         "ct": city,
         "ch": "KA" if code == "7420" else context["canonical_channel"].get(cid) or org_customer.get("channel") or reference.get("ch") or UNMAPPED,
-        "nr": region if region != UNMAPPED else org_customer.get("region") or reference.get("nr") or UNMAPPED,
+        "nr": region,
         "mcid": merged_id,
         "mcn": context["customer_names"].get(merged_id) or context["listed_names"].get(merged_id) or reference.get("mcn") or (cn if merged_id == cid else UNMAPPED),
     }
@@ -511,6 +546,7 @@ def enrich_yoy(customer_id: str, customer_name: str, office: str, context: dict[
         "p": enriched["p"],
         "ct": enriched["ct"],
         "ch": enriched["ch"],
+        "nr": enriched["nr"],
         "mcid": enriched["mcid"],
         "mcn": enriched["mcn"],
     }
@@ -562,6 +598,7 @@ def build_yoy_rows_2025(df: pd.DataFrame, context: dict[str, Any]) -> list[dict[
             "cat": clean_str(row.get("品类")),
             "item": clean_str(row.get("品项")),
             "ch": enriched["ch"],
+            "nr": enriched["nr"],
             "p": enriched["p"],
             "ct": enriched["ct"],
             "mcid": enriched["mcid"],
@@ -592,6 +629,7 @@ def build_yoy_rows_2026(df: pd.DataFrame, context: dict[str, Any]) -> list[dict[
             "cat": clean_str(row.get("品类")),
             "item": clean_str(row.get("品项")),
             "ch": enriched["ch"],
+            "nr": enriched["nr"],
             "p": enriched["p"],
             "ct": enriched["ct"],
             "mcid": enriched["mcid"],
@@ -610,7 +648,7 @@ def build_yoy_rows_2026(df: pd.DataFrame, context: dict[str, Any]) -> list[dict[
 
 
 def aggregate_yoy(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    dims = ("y", "mo", "cat", "item", "ch", "p", "ct", "mcid", "mcn", "pc", "pn", "o")
+    dims = ("y", "mo", "cat", "item", "ch", "nr", "p", "ct", "mcid", "mcn", "pc", "pn", "o")
     grouped: dict[tuple[Any, ...], dict[str, Any]] = {}
     for record in records:
         key = tuple(record[dim] for dim in dims)
@@ -689,7 +727,41 @@ def build_unmapped_rows(df: pd.DataFrame, year: int, context: dict[str, Any]) ->
     return list(output.values())
 
 
-def write_unmapped_report(rows: list[dict[str, str]]) -> None:
+def build_region_unmapped_rows(
+    records: list[dict[str, Any]],
+    source_report: str,
+    region_map: dict[str, str],
+    year_field: str,
+    sales_field: str,
+) -> list[dict[str, Any]]:
+    grouped: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+    for record in records:
+        office = clean_str(record.get("o"))
+        code = office_code(office)
+        if code in region_map:
+            continue
+        year = clean_str(record.get(year_field))
+        key = (source_report, year, code or "未提取", office)
+        row = grouped.setdefault(
+            key,
+            {
+                "来源报表": source_report,
+                "年份": year,
+                "销售办公室编码": code or "未提取",
+                "销售办公室": office,
+                "记录数": 0,
+                "销售额": 0.0,
+            },
+        )
+        row["记录数"] += 1
+        row["销售额"] += float(record.get(sales_field) or 0)
+    return list(grouped.values())
+
+
+def write_unmapped_report(
+    rows: list[dict[str, str]],
+    region_rows: list[dict[str, Any]] | None = None,
+) -> None:
     columns = ["年份", "来源月份", "客户编码", "客户名称", "销售办事处", "销售地区", "缺失字段"]
     detail = pd.DataFrame(rows, columns=columns).sort_values(columns, kind="stable")
     summary = (
@@ -702,6 +774,12 @@ def write_unmapped_report(rows: list[dict[str, str]]) -> None:
     with pd.ExcelWriter(UNMAPPED_OUTPUT, engine="openpyxl") as writer:
         detail.to_excel(writer, sheet_name="未映射明细", index=False)
         summary.to_excel(writer, sheet_name="汇总", index=False)
+        pd.DataFrame(
+            region_rows or [],
+            columns=["来源报表", "年份", "销售办公室编码", "销售办公室", "记录数", "销售额"],
+        ).sort_values(
+            ["来源报表", "年份", "销售办公室编码"], kind="stable"
+        ).to_excel(writer, sheet_name="大区未映射", index=False)
 
 
 def update_quality_sales(data: dict[str, Any], records: list[dict[str, Any]], source_2026: Path, stats_2026: dict[str, Any]) -> None:
@@ -792,22 +870,38 @@ def update_quality_yoy(data: dict[str, Any], records: list[dict[str, Any]], sour
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="按26年1月销售办公室主数据生成TBFX看板")
+    parser.add_argument("--region-master", required=True, type=Path, help="包含26年1月Sheet的销售办公室主数据")
+    args = parser.parse_args()
     source_2026, source_2025 = copy_sources_to_f_dir()
     sales_data = load_app_data(SALES_STATIC)
     yoy_data = load_app_data(YOY_STATIC)
-    context = build_lookup_context()
+    context = build_lookup_context(args.region_master)
 
     df_2026 = read_workbook(source_2026, "26")
     df_2025 = read_workbook(source_2025, "25")
     clean_2026, stats_2026 = filter_2026(df_2026)
     clean_2025, stats_2025 = filter_2025(df_2025)
 
-    unmapped_rows = build_unmapped_rows(clean_2025, 2025, context) + build_unmapped_rows(clean_2026, 2026, context)
-    write_unmapped_report(unmapped_rows)
-
     sales_records = build_sales_records(clean_2026, context)
     yoy_raw = build_yoy_rows_2025(clean_2025, context) + build_yoy_rows_2026(clean_2026, context)
     yoy_records = aggregate_yoy(yoy_raw)
+
+    unmapped_rows = build_unmapped_rows(clean_2025, 2025, context) + build_unmapped_rows(clean_2026, 2026, context)
+    region_unmapped_rows = build_region_unmapped_rows(
+        sales_records,
+        "2026销售报表",
+        context["canonical_region"],
+        "mo",
+        "inc",
+    ) + build_region_unmapped_rows(
+        yoy_records,
+        "2025/2026同比报表",
+        context["canonical_region"],
+        "y",
+        "inc",
+    )
+    write_unmapped_report(unmapped_rows, region_unmapped_rows)
 
     sales_data["records"] = sales_records
     sales_data["monthOrder"] = ["2026.01", "2026.02", "2026.03", "2026.04", "2026.05", "2026.06", "2026.07"]
