@@ -319,7 +319,10 @@ REGION_LABELS = {
     "东北区", "华北区", "西北区", "西南区", "华中区", "华东区", "华南区", "烘焙南区",
     "MKA", "RKA", "出口", "电商", "GKA", "BKA",
 }
-EXPLICIT_REGION_OVERRIDES = {"7363": "华北区"}
+EXPLICIT_REGION_OVERRIDES = {
+    "7363": "华北区",
+    "7556": "华东区",
+}
 
 
 def load_26_01_region_map(path: Path) -> dict[str, str]:
