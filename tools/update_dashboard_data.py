@@ -909,6 +909,10 @@ def main() -> None:
     sales_data["records"] = sales_records
     sales_data["monthOrder"] = ["2026.01", "2026.02", "2026.03", "2026.04", "2026.05", "2026.06", "2026.07"]
     sales_data["channelOrder"] = YOY_CHANNEL_ORDER
+    region_order = list(sales_data.get("newRegionOrder") or [])
+    if "GKA" not in region_order:
+        region_order.append("GKA")
+    sales_data["newRegionOrder"] = region_order
     update_quality_sales(sales_data, sales_records, source_2026, stats_2026)
     yoy_data["records"] = yoy_records
     yoy_data["monthOrder"] = YOY_MONTH_ORDER
