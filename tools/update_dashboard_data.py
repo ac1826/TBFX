@@ -20,7 +20,7 @@ SALES_STATIC = STATIC_DIR / "2026-sales-dashboard.html"
 YOY_STATIC = STATIC_DIR / "2026-vs-2025-yoy-dashboard.html"
 
 F_DIR = Path("F:/llqdocument/大成文件/客户贡献分析")
-SOURCE_2026_NAME = "PFS 26年毛利表1-7月 含电商 TOP20新.xlsx"
+SOURCE_2026_NAME = "PFS 26年毛利表1-7月含电商 TOP20新版11.xlsx"
 SOURCE_2025_NAME = "PFS 25年毛利表1-7月 含电商 TOP20 -品项实际 新.xlsx"
 YOY_MONTH_ORDER = [f"{month}月" for month in range(1, 8)]
 YOY_CHANNEL_ORDER = ["烘焙", "休闲", "团膳", "宴席", "零售", "KA", "鲜食工厂", "其他"]
@@ -36,6 +36,8 @@ BAD_CODES = {"CA2428001", "CC1131011"}
 DELETE_MARKER = "删"
 UNMAPPED = "未映射"
 UNMAPPED_OUTPUT = F_DIR / "未映射明细.xlsx"
+OFFICE_ADJUSTMENT_EXPECTED_ROWS = 146
+OFFICE_ADJUSTMENT_EXPECTED_NET_MARGIN_K = 1_045.9658
 
 # Explicit location supplements confirmed from public company/government records.
 # These are keyed by customer ID; office names are never used to infer geography.
@@ -156,6 +158,14 @@ def num(value: Any) -> float:
     if pd.isna(parsed):
         return 0.0
     return float(parsed)
+
+
+def first_present(row: dict[str, Any], *names: str) -> Any:
+    """Return the value from the first source column that exists."""
+    for name in names:
+        if name in row:
+            return row.get(name)
+    return None
 
 
 def k(value: float, digits: int = 6) -> float:
@@ -466,6 +476,43 @@ def office_3005_mask(df: pd.DataFrame) -> pd.Series:
     return office.str.startswith("3005", na=False)
 
 
+def _source_blank(value: Any) -> bool:
+    return clean_str(value) in {"", "-"}
+
+
+def split_office_adjustments_2026(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Separate office/month-only net-contribution adjustments from rankable detail."""
+    dimension_columns = ["客户编码", "客户描述", "物料号", "物料描述", "品类", "品项"]
+    missing = [column for column in dimension_columns if column not in df.columns]
+    if missing:
+        raise ValueError(f"2026 source is missing adjustment dimensions: {', '.join(missing)}")
+
+    allocated_column = next((name for name in ("分摊折让", "分摊后折让") if name in df.columns), None)
+    if allocated_column is None or "扣除折让运费净边贡" not in df.columns:
+        raise ValueError("2026 source is missing office-adjustment amount columns")
+
+    blank_dimensions = pd.Series(True, index=df.index)
+    for column in dimension_columns:
+        blank_dimensions &= df[column].map(_source_blank)
+    direct_net = df["扣除折让运费净边贡"].map(num)
+    allocated = df[allocated_column].map(num)
+    candidate = blank_dimensions & (direct_net.abs().gt(1e-9) | allocated.abs().gt(1e-9))
+
+    office_present = df["销售办事处"].map(lambda value: not _source_blank(value))
+    month_present = df["月份"].map(lambda value: not _source_blank(value))
+    zero_business = pd.Series(True, index=df.index)
+    for column in ("销量KG", "销售额", "销售收入", "折让合计", "实际出厂边贡", "运费合计"):
+        if column in df.columns:
+            zero_business &= df[column].map(num).abs().le(1e-9)
+    amounts_reconcile = (direct_net + allocated).abs().le(1e-6)
+    valid = candidate & office_present & month_present & direct_net.abs().gt(1e-9) & allocated.abs().gt(1e-9) & zero_business & amounts_reconcile
+    malformed = candidate & ~valid
+    if malformed.any():
+        rows = [str(int(index) + 3) for index in df.index[malformed][:10]]
+        raise ValueError(f"Malformed office net-contribution adjustments at source rows: {', '.join(rows)}")
+    return df.loc[~valid].copy(), df.loc[valid].copy()
+
+
 def filter_2026(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, Any]]:
     code = df["物料号"].map(clean_code)
     delete_mask = df.apply(lambda row: has_delete_marker(row.get("物料描述"), row.get("品类"), row.get("品项")), axis=1)
@@ -581,11 +628,34 @@ def build_sales_records(df: pd.DataFrame, context: dict[str, Any]) -> list[dict[
             "dt": k(num(row.get("返利"))),
             "am": k(num(row.get("实际出厂边贡"))),
             "fr": k(num(row.get("运费合计"))),
-            "ad": k(num(row.get("分摊折让"))),
+            "ad": k(num(first_present(row, "分摊折让", "分摊后折让"))),
             "nm": k(num(row.get("扣除折让运费净边贡"))),
             "ni": k(num(row.get("销售收入"))),
         })
     return records
+
+
+def build_office_adjustments_2026(df: pd.DataFrame, context: dict[str, Any]) -> list[dict[str, Any]]:
+    adjustments: list[dict[str, Any]] = []
+    for row in df.to_dict("records"):
+        office = clean_str(row.get("销售办事处"))
+        code = office_code(office)
+        region = context["canonical_region"].get(code, "")
+        if not region:
+            raise ValueError(f"Office adjustment has no region mapping: {office}")
+        month_value, month_raw = month_2026(row.get("月份"))
+        adjustments.append({
+            "y": "2026",
+            "mo": month_cn(row.get("月份"), "2026"),
+            "mr": month_value,
+            "mraw": month_raw,
+            "o": office,
+            "nr": region,
+            "nm": k(num(row.get("扣除折让运费净边贡"))),
+            "ad": k(num(first_present(row, "分摊折让", "分摊后折让"))),
+        })
+    adjustments.sort(key=lambda item: (item["mr"], item["nr"], item["o"]))
+    return adjustments
 
 
 def build_yoy_rows_2025(df: pd.DataFrame, context: dict[str, Any]) -> list[dict[str, Any]]:
@@ -643,7 +713,7 @@ def build_yoy_rows_2026(df: pd.DataFrame, context: dict[str, Any]) -> list[dict[
             "src": 1,
             "v": k(num(row.get("销量KG"))),
             "inc": k(num(row.get("销售额"))),
-            "ad": k(num(row.get("分摊折让"))),
+            "ad": k(num(first_present(row, "分摊折让", "分摊后折让"))),
             "nm": k(num(row.get("扣除折让运费净边贡"))),
             "ni": k(num(row.get("销售收入"))),
         })
@@ -692,6 +762,15 @@ def totals(records: list[dict[str, Any]]) -> dict[str, float]:
         "net_margin_k": round(net_margin, 6),
         "net_margin_rate": net_margin / net_margin_base if net_margin_base else 0.0,
     }
+
+
+def totals_with_adjustments(records: list[dict[str, Any]], adjustments: list[dict[str, Any]]) -> dict[str, float]:
+    result = totals(records)
+    result["net_margin_k"] = round(
+        result["net_margin_k"] + sum(float(row.get("nm") or 0) for row in adjustments),
+        6,
+    )
+    return result
 
 
 def build_unmapped_rows(df: pd.DataFrame, year: int, context: dict[str, Any]) -> list[dict[str, str]]:
@@ -785,7 +864,7 @@ def write_unmapped_report(
         ).to_excel(writer, sheet_name="大区未映射", index=False)
 
 
-def update_quality_sales(data: dict[str, Any], records: list[dict[str, Any]], source_2026: Path, stats_2026: dict[str, Any]) -> None:
+def update_quality_sales(data: dict[str, Any], records: list[dict[str, Any]], adjustments: list[dict[str, Any]], source_2026: Path, stats_2026: dict[str, Any]) -> None:
     quality = data.setdefault("quality", {})
     quality["period"] = "2026.01-2026.07"
     quality["source"] = str(source_2026)
@@ -813,7 +892,12 @@ def update_quality_sales(data: dict[str, Any], records: list[dict[str, Any]], so
     quality["total_net_income_k"] = round(total_net_income, 6)
     quality["total_allocated_discount_k"] = round(total_allocated_discount, 6)
     quality["total_net_margin_base_k"] = round(total_net_margin_base, 6)
-    quality["total_net_margin_k"] = round(total_net_margin, 6)
+    adjustment_net_margin = sum(float(record.get("nm") or 0) for record in adjustments)
+    quality["detail_net_margin_k"] = round(total_net_margin, 6)
+    quality["office_adjustment_rows"] = len(adjustments)
+    quality["office_adjustment_net_margin_k"] = round(adjustment_net_margin, 6)
+    quality["office_adjustment_allocated_discount_k"] = round(sum(float(record.get("ad") or 0) for record in adjustments), 6)
+    quality["total_net_margin_k"] = round(total_net_margin + adjustment_net_margin, 6)
     quality["net_margin_rate"] = total_net_margin / total_net_margin_base if total_net_margin_base else 0.0
     quality["excluded_fake_product_rows"] = stats_2026["excluded_fake_product_rows"]
     quality["excluded_fake_product_income_k"] = stats_2026["excluded_fake_product_income_k"]
@@ -826,7 +910,7 @@ def update_quality_sales(data: dict[str, Any], records: list[dict[str, Any]], so
     quality["missing_customer_cnt"] = len({record["cid"] for record in records if record.get("p") == "未识别"})
 
 
-def update_quality_yoy(data: dict[str, Any], records: list[dict[str, Any]], source_2025: Path, source_2026: Path, stats_2025: dict[str, Any], stats_2026: dict[str, Any]) -> None:
+def update_quality_yoy(data: dict[str, Any], records: list[dict[str, Any]], adjustments: list[dict[str, Any]], source_2025: Path, source_2026: Path, stats_2025: dict[str, Any], stats_2026: dict[str, Any]) -> None:
     quality = data.setdefault("quality", {})
     quality["source_2025"] = str(source_2025)
     quality["source_2026"] = str(source_2026)
@@ -844,10 +928,19 @@ def update_quality_yoy(data: dict[str, Any], records: list[dict[str, Any]], sour
     column_map.setdefault("2025", {})["net_income"] = "销售收入 / 1000（未税收入，用于净边贡率分母）"
     quality["aggregated_rows"] = len(records)
     quality["category_cnt"] = len({record["cat"] for record in records if record.get("cat")})
-    quality["totals"] = {
+    quality["detail_totals"] = {
         "2025": totals([record for record in records if record.get("y") == "2025"]),
         "2026": totals([record for record in records if record.get("y") == "2026"]),
     }
+    quality["totals"] = {
+        "2025": quality["detail_totals"]["2025"],
+        "2026": totals_with_adjustments(
+            [record for record in records if record.get("y") == "2026"], adjustments
+        ),
+    }
+    quality["office_adjustment_rows"] = len(adjustments)
+    quality["office_adjustment_net_margin_k"] = round(sum(float(record.get("nm") or 0) for record in adjustments), 6)
+    quality["office_adjustment_allocated_discount_k"] = round(sum(float(record.get("ad") or 0) for record in adjustments), 6)
     quality["raw_rows_2025"] = stats_2025["raw_rows"]
     quality["excluded_fake_product_rows_2025"] = stats_2025["excluded_fake_product_rows"]
     quality["excluded_fake_product_income_k_2025"] = stats_2025["excluded_fake_product_income_k"]
@@ -886,11 +979,21 @@ def main() -> None:
     clean_2026, stats_2026 = filter_2026(df_2026)
     clean_2025, stats_2025 = filter_2025(df_2025)
 
-    sales_records = build_sales_records(clean_2026, context)
-    yoy_raw = build_yoy_rows_2025(clean_2025, context) + build_yoy_rows_2026(clean_2026, context)
+    detail_2026, adjustment_rows_2026 = split_office_adjustments_2026(clean_2026)
+    adjustments = build_office_adjustments_2026(adjustment_rows_2026, context)
+    if len(adjustments) != OFFICE_ADJUSTMENT_EXPECTED_ROWS:
+        raise ValueError(f"Expected {OFFICE_ADJUSTMENT_EXPECTED_ROWS} office adjustments, found {len(adjustments)}")
+    adjustment_total = round(sum(float(record["nm"]) for record in adjustments), 6)
+    if not math.isclose(adjustment_total, OFFICE_ADJUSTMENT_EXPECTED_NET_MARGIN_K, abs_tol=1e-6):
+        raise ValueError(
+            f"Office adjustment total mismatch: expected {OFFICE_ADJUSTMENT_EXPECTED_NET_MARGIN_K}, found {adjustment_total}"
+        )
+
+    sales_records = build_sales_records(detail_2026, context)
+    yoy_raw = build_yoy_rows_2025(clean_2025, context) + build_yoy_rows_2026(detail_2026, context)
     yoy_records = aggregate_yoy(yoy_raw)
 
-    unmapped_rows = build_unmapped_rows(clean_2025, 2025, context) + build_unmapped_rows(clean_2026, 2026, context)
+    unmapped_rows = build_unmapped_rows(clean_2025, 2025, context) + build_unmapped_rows(detail_2026, 2026, context)
     region_unmapped_rows = build_region_unmapped_rows(
         sales_records,
         "2026销售报表",
@@ -907,17 +1010,19 @@ def main() -> None:
     write_unmapped_report(unmapped_rows, region_unmapped_rows)
 
     sales_data["records"] = sales_records
+    sales_data["netContributionAdjustments"] = adjustments
     sales_data["monthOrder"] = ["2026.01", "2026.02", "2026.03", "2026.04", "2026.05", "2026.06", "2026.07"]
     sales_data["channelOrder"] = YOY_CHANNEL_ORDER
     region_order = list(sales_data.get("newRegionOrder") or [])
     if "GKA" not in region_order:
         region_order.append("GKA")
     sales_data["newRegionOrder"] = region_order
-    update_quality_sales(sales_data, sales_records, source_2026, stats_2026)
+    update_quality_sales(sales_data, sales_records, adjustments, source_2026, stats_2026)
     yoy_data["records"] = yoy_records
+    yoy_data["netContributionAdjustments"] = adjustments
     yoy_data["monthOrder"] = YOY_MONTH_ORDER
     yoy_data["channelOrder"] = YOY_CHANNEL_ORDER
-    update_quality_yoy(yoy_data, yoy_records, source_2025, source_2026, stats_2025, stats_2026)
+    update_quality_yoy(yoy_data, yoy_records, adjustments, source_2025, source_2026, stats_2025, stats_2026)
 
     for path, data in ((SALES_STATIC, sales_data), (YOY_STATIC, yoy_data)):
         replace_app_data(path, data)
@@ -930,7 +1035,13 @@ def main() -> None:
         "source_2025": str(source_2025),
         "sales_records": len(sales_records),
         "yoy_records": len(yoy_records),
-        "sales_totals": totals(sales_records),
+        "sales_detail_totals": totals(sales_records),
+        "sales_totals": totals_with_adjustments(sales_records, adjustments),
+        "office_adjustments": {
+            "rows": len(adjustments),
+            "net_margin_k": adjustment_total,
+            "allocated_discount_k": round(sum(float(record["ad"]) for record in adjustments), 6),
+        },
         "yoy_totals": yoy_data["quality"]["totals"],
         "stats_2026": stats_2026,
         "stats_2025": stats_2025,
