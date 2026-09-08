@@ -9,7 +9,10 @@ import pandas as pd
 from tools.update_dashboard_data import (
     YOY_CHANNEL_ORDER,
     YOY_MONTH_ORDER,
+    city_from_sales_region,
+    enrich_sales,
     first_present,
+    load_app_data,
     month_cn,
     split_office_adjustments_2026,
     totals_with_adjustments,
@@ -24,6 +27,7 @@ def test_month_cn_normalizes_short_year_month_codes() -> None:
     assert month_cn("2507", "2025") == "7月"
     assert month_cn("2606月", "2026") == "6月"
     assert month_cn("2607", "2026") == "7月"
+    assert month_cn("2608", "2026") == "8月"
 
 
 def test_month_cn_keeps_plain_month_values() -> None:
@@ -32,8 +36,65 @@ def test_month_cn_keeps_plain_month_values() -> None:
 
 
 def test_dashboard_filter_orders_include_latest_month_and_eight_channels() -> None:
-    assert YOY_MONTH_ORDER == [f"{month}月" for month in range(1, 8)]
+    assert YOY_MONTH_ORDER == [f"{month}月" for month in range(1, 9)]
     assert YOY_CHANNEL_ORDER == ["烘焙", "休闲", "团膳", "宴席", "零售", "KA", "鲜食工厂", "其他"]
+
+
+def test_sales_region_explicitly_supplies_city() -> None:
+    assert city_from_sales_region("江苏南通") == "南通"
+    assert city_from_sales_region("河南省郑州市中牟县") == "郑州"
+    assert city_from_sales_region("北京(省级)") == "北京"
+    assert city_from_sales_region("南方地区") == ""
+
+
+def test_name_consensus_fills_dimensions_without_merging_customer_identity() -> None:
+    context = {
+        "canonical_geo": {},
+        "customer_cities": {},
+        "org_customers": {},
+        "reference_maps": {},
+        "canonical_region": {"7350": "RKA"},
+        "merged_customers": {},
+        "canonical_channel": {},
+        "customer_names": {},
+        "listed_names": {},
+        "name_dimension_index": {"苏州圆融享德来餐饮管": []},
+        "resolve_name_dimensions": lambda _name, _index: {
+            "status": "mapped",
+            "channel": "KA",
+            "province": "江苏省",
+            "city": "苏州",
+        },
+    }
+
+    enriched = enrich_sales(
+        {"客户编码": "274770", "客户描述": "苏州圆融享德来餐饮管", "销售办事处": "7350 RKA"},
+        context,
+    )
+
+    assert enriched["ch"] == "KA"
+    assert enriched["p"] == "江苏省"
+    assert enriched["ct"] == "苏州"
+    assert enriched["mcid"] == "274770"
+    assert enriched["mcn"] == "苏州圆融享德来餐饮管"
+    assert enriched["name_match_status"] == "mapped"
+
+
+def test_generated_enjoydelai_name_consensus_mapping_keeps_customer_ids() -> None:
+    expected = {
+        "274770", "274771", "274775", "274781", "274782",
+        "274783", "274785", "274789", "274791",
+    }
+    unresolved = {"274777", "274778", "274779", "274787", "274790"}
+    records = load_app_data(ROOT / "streamlit_html_portal/static/2026-sales-dashboard.html")["records"]
+    mapped_rows = [row for row in records if row.get("cid") in expected]
+    unresolved_rows = [row for row in records if row.get("cid") in unresolved]
+
+    assert {row["cid"] for row in mapped_rows} == expected
+    assert all((row["ch"], row["p"], row["ct"]) == ("KA", "江苏省", "苏州") for row in mapped_rows)
+    assert all(row["mcid"] == row["cid"] for row in mapped_rows)
+    assert {row["cid"] for row in unresolved_rows} == unresolved
+    assert all(row["ch"] == "未映射" or row["p"] == "未识别省份" or row["ct"] == "未映射" for row in unresolved_rows)
 
 
 def test_dashboard_display_precision_contract() -> None:
