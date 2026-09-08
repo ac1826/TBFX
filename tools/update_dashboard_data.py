@@ -40,9 +40,29 @@ UNMAPPED_OUTPUT = F_DIR / "未映射明细.xlsx"
 OFFICE_ADJUSTMENT_EXPECTED_ROWS = 165
 OFFICE_ADJUSTMENT_EXPECTED_NET_MARGIN_K = 1_133.19553
 
-# Explicit location supplements confirmed from public company/government records.
+# Explicit location supplements confirmed from public records or by the user.
 # These are keyed by customer ID; office names are never used to infer geography.
 RESEARCHED_GEO: dict[str, dict[str, str]] = {
+    "274723": {"p": "上海市", "ct": "上海", "source": "用户确认：上海，2026-09-08"},
+    "274745": {"p": "辽宁省", "ct": "沈阳", "source": "用户确认：辽宁沈阳，2026-09-08"},
+    "274747": {"p": "江苏省", "ct": "常州", "source": "用户确认：江苏省常州市，2026-09-08"},
+    "274751": {"p": "江苏省", "ct": "无锡", "source": "用户确认：江苏宜兴；地级市汇总为无锡，2026-09-08"},
+    "274772": {"p": "江苏省", "ct": "苏州", "source": "用户确认：苏州市高新区，2026-09-08"},
+    "274773": {"p": "江苏省", "ct": "苏州", "source": "用户确认：苏州市，2026-09-08"},
+    "274774": {"p": "江苏省", "ct": "苏州", "source": "用户确认：苏州市，2026-09-08"},
+    "274776": {"p": "江苏省", "ct": "苏州", "source": "用户确认：苏州市，2026-09-08"},
+    "274777": {"p": "江苏省", "ct": "苏州", "source": "用户确认：苏州市，2026-09-08"},
+    "274779": {"p": "江苏省", "ct": "苏州", "source": "用户确认：苏州市，2026-09-08"},
+    "274780": {"p": "江苏省", "ct": "苏州", "source": "用户确认：苏州市，2026-09-08"},
+    "274786": {"p": "江苏省", "ct": "苏州", "source": "用户确认：苏州市，2026-09-08"},
+    "274787": {"p": "江苏省", "ct": "苏州", "source": "用户确认：苏州市，2026-09-08"},
+    "274788": {"p": "浙江省", "ct": "宁波", "source": "用户确认：浙江宁波，2026-09-08"},
+    "274790": {"p": "江苏省", "ct": "南京", "source": "用户确认：江苏南京，2026-09-08"},
+    "274748": {"p": "江苏省", "ct": "无锡", "source": "https://file.smejs.cn/file/group1/M00/00/35/rBIAAWbxGKCAcAueAI0Jwal2TMk471.pdf"},
+    "274750": {"p": "上海市", "ct": "上海", "source": "https://www.shuididp.cn/yp-2068e4c36daaf6e5c4fe820f0fb6fd01.html"},
+    "274752": {"p": "江苏省", "ct": "苏州", "source": "https://www.shuididp.cn/yp-917cf92f0f96b521aa652bf1b01d9701.html"},
+    "274778": {"p": "江苏省", "ct": "苏州", "source": "https://www.shuididp.cn/yp-110359d6d2eae4334795d2e43503d801.html"},
+    "274784": {"p": "江苏省", "ct": "苏州", "source": "https://www.shuididp.cn/yp-830c0e3f7a927560ec4571b5b6df2b01.html"},
     "GBR0000": {"p": "香港特别行政区", "ct": "中国香港", "source": "用户明确规则"},
     "274055": {"p": "广东省", "ct": "东莞", "source": "https://www.evirthfood.com/news.html"},
     "GW15": {"p": "辽宁省", "ct": "大连", "source": "https://www.dfa3999.com/sc/responsibility_news_details.php?id=36"},
@@ -438,6 +458,7 @@ def build_lookup_context(region_master: Path) -> dict[str, Any]:
     from src.pipeline import (
         build_name_consensus_dimension_index,
         build_strict_dimension_maps,
+        USER_CONFIRMED_RKA_2026,
         resolve_name_consensus_dimensions,
     )
 
@@ -553,6 +574,7 @@ def build_lookup_context(region_master: Path) -> dict[str, Any]:
             geo["p"] = province
     return {
         "canonical_channel": canonical_channel,
+        "user_rka_2026": USER_CONFIRMED_RKA_2026,
         "canonical_region": canonical_region,
         "canonical_geo": canonical_geo,
         "customer_names": customer_names,
@@ -672,7 +694,7 @@ def filter_2025(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, Any]]:
     }
 
 
-def enrich_sales(record: dict[str, Any], context: dict[str, Any]) -> dict[str, str]:
+def enrich_sales(record: dict[str, Any], context: dict[str, Any], year: int = 2026) -> dict[str, str]:
     cid = clean_code(record.get("客户编码"))
     cn = clean_str(record.get("客户描述"))
     office = clean_str(record.get("销售办事处"))
@@ -680,6 +702,8 @@ def enrich_sales(record: dict[str, Any], context: dict[str, Any]) -> dict[str, s
     org_customer = context["org_customers"].get(cid) or {}
     reference = context["reference_maps"].get(cid) or {}
     researched = RESEARCHED_GEO.get(cid) or {}
+    if year != 2026 and cid in context.get("user_rka_2026", ()):
+        researched = {}
     code = office_code(office)
     canonical_region = context["canonical_region"].get(code, "")
     merged_id = context["merged_customers"].get(cid) or reference.get("mcid") or cid
@@ -709,6 +733,8 @@ def enrich_sales(record: dict[str, Any], context: dict[str, Any]) -> dict[str, s
         or org_customer.get("channel")
         or reference.get("ch")
     )
+    if year == 2026 and cid in context.get("user_rka_2026", ()) and not code.startswith("3005"):
+        primary_channel = "KA"
     name_match = {"status": "not_needed"}
     if not primary_city or not primary_province or not primary_channel:
         name_match = context["resolve_name_dimensions"](
@@ -740,8 +766,8 @@ def enrich_sales(record: dict[str, Any], context: dict[str, Any]) -> dict[str, s
     }
 
 
-def enrich_yoy(customer_id: str, customer_name: str, office: str, context: dict[str, Any]) -> dict[str, str]:
-    enriched = enrich_sales({"客户编码": customer_id, "客户描述": customer_name, "销售办事处": office}, context)
+def enrich_yoy(customer_id: str, customer_name: str, office: str, context: dict[str, Any], year: int = 2026) -> dict[str, str]:
+    enriched = enrich_sales({"客户编码": customer_id, "客户描述": customer_name, "销售办事处": office}, context, year)
     return {
         "p": enriched["p"],
         "ct": enriched["ct"],
@@ -814,7 +840,7 @@ def build_yoy_rows_2025(df: pd.DataFrame, context: dict[str, Any]) -> list[dict[
         customer_id = clean_code(row.get("客户编码"))
         customer_name = clean_str(row.get("客户描述"))
         office = clean_str(row.get("销售办事处"))
-        enriched = enrich_yoy(customer_id, customer_name, office, context)
+        enriched = enrich_yoy(customer_id, customer_name, office, context, 2025)
         records.append({
             "y": "2025",
             "mo": month_cn(row.get("月份"), "2025"),
@@ -926,22 +952,20 @@ def totals_with_adjustments(records: list[dict[str, Any]], adjustments: list[dic
 def build_unmapped_rows(df: pd.DataFrame, year: int, context: dict[str, Any]) -> list[dict[str, str]]:
     output: dict[tuple[str, ...], dict[str, str]] = {}
     for row in df.to_dict("records"):
+        if month_cn(row.get("月份"), str(year)) != "8月":
+            continue
         customer_id = clean_code(row.get("客户编码"))
         customer_name = clean_str(row.get("客户描述"))
         office = clean_str(row.get("销售办事处"))
         code = office_code(office)
-        enriched = enrich_sales(row, context)
+        enriched = enrich_sales(row, context, year)
         missing: list[str] = []
         if enriched["ch"] == UNMAPPED:
             missing.append("渠道")
-        if customer_id in context["merged_customers"] and enriched["mcn"] == UNMAPPED:
-            missing.append("合并客户名称")
-        if enriched["ct"] == UNMAPPED:
+        if not code.startswith("3005") and enriched["ct"] == UNMAPPED:
             missing.append("城市")
-        if enriched["p"] in {UNMAPPED, "未识别省份"}:
+        if not code.startswith("3005") and enriched["p"] in {UNMAPPED, "未识别省份"}:
             missing.append("省份")
-        if enriched["nr"] == UNMAPPED:
-            missing.append("大区")
         if not missing:
             continue
         month_label = month_cn(row.get("月份"), str(year))
@@ -976,7 +1000,7 @@ def name_consensus_quality(
             if key in seen:
                 continue
             seen.add(key)
-            enriched = enrich_sales(row, context)
+            enriched = enrich_sales(row, context, year)
             status = enriched["name_match_status"]
             if status in {"mapped", "conflict", "incomplete"}:
                 counts["candidate_hits"] += 1

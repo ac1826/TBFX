@@ -80,21 +80,47 @@ def test_name_consensus_fills_dimensions_without_merging_customer_identity() -> 
     assert enriched["name_match_status"] == "mapped"
 
 
+def test_rka_customer_override_is_year_scoped_and_keeps_identity() -> None:
+    context = {key: {} for key in (
+        "canonical_geo", "customer_cities", "org_customers", "reference_maps",
+        "canonical_region", "merged_customers", "canonical_channel", "customer_names",
+        "listed_names", "name_dimension_index",
+    )}
+    context["user_rka_2026"] = {"274778"}
+    context["resolve_name_dimensions"] = lambda *_: {"status": "no_candidate"}
+    row = {"客户编码": "274778", "客户描述": "苏州市健善享德来餐饮", "销售办事处": "7350 RKA"}
+    current = enrich_sales(row, context, 2026)
+    previous = enrich_sales(row, context, 2025)
+    assert (current["ch"], current["p"], current["ct"]) == ("KA", "江苏省", "苏州")
+    assert current["mcid"] == "274778"
+    assert previous["ch"] == "未映射"
+    assert previous["p"] == "未识别省份"
+    assert previous["ct"] == "未映射"
+    row["销售办事处"] = "3005 电商"
+    assert enrich_sales(row, context, 2026)["ch"] == "电商"
+
+
 def test_generated_enjoydelai_name_consensus_mapping_keeps_customer_ids() -> None:
     expected = {
         "274770", "274771", "274775", "274781", "274782",
         "274783", "274785", "274789", "274791",
     }
-    unresolved = {"274777", "274778", "274779", "274787", "274790"}
+    expected.update({"274772", "274773", "274774", "274776", "274777", "274778",
+                     "274779", "274780", "274784", "274786", "274787"})
     records = load_app_data(ROOT / "streamlit_html_portal/static/2026-sales-dashboard.html")["records"]
     mapped_rows = [row for row in records if row.get("cid") in expected]
-    unresolved_rows = [row for row in records if row.get("cid") in unresolved]
 
     assert {row["cid"] for row in mapped_rows} == expected
     assert all((row["ch"], row["p"], row["ct"]) == ("KA", "江苏省", "苏州") for row in mapped_rows)
     assert all(row["mcid"] == row["cid"] for row in mapped_rows)
-    assert {row["cid"] for row in unresolved_rows} == unresolved
-    assert all(row["ch"] == "未映射" or row["p"] == "未识别省份" or row["ct"] == "未映射" for row in unresolved_rows)
+    for customer, province, city in [
+        ("274788", "浙江省", "宁波"), ("274790", "江苏省", "南京"),
+        ("274723", "上海市", "上海"), ("274745", "辽宁省", "沈阳"),
+        ("274747", "江苏省", "常州"), ("274751", "江苏省", "无锡"),
+    ]:
+        selected = [row for row in records if row.get("cid") == customer]
+        assert selected
+        assert all((row["ch"], row["p"], row["ct"], row["mcid"]) == ("KA", province, city, customer) for row in selected)
 
 
 def test_dashboard_display_precision_contract() -> None:
