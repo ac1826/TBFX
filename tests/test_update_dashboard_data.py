@@ -162,6 +162,43 @@ def test_office_adjustments_are_split_from_rankable_detail() -> None:
     assert len(detail) == 1
     assert len(adjustments) == 1
     assert adjustments.iloc[0]["扣除折让运费净边贡"] == 3717.79
+    prior = frame.rename(columns={
+        "扣除折让运费净边贡": "扣除折让运费的净边贡",
+        "分摊后折让": "分摊的折让",
+    }).copy()
+    prior["月份"] = 2508
+    prior.loc[0, "扣除折让运费的净边贡"] = -9530
+    prior.loc[0, "分摊的折让"] = 9530
+    detail25, adjustments25 = split_office_adjustments_2026(prior, 2025)
+    assert len(detail25) == len(adjustments25) == 1
+    assert adjustments25.iloc[0]["扣除折让运费的净边贡"] == -9530
+
+
+def test_yoy_adjustments_use_year_month_and_filter_scope() -> None:
+    import re
+    import subprocess
+    html = (ROOT / "streamlit_html_portal/static/2026-vs-2025-yoy-dashboard.html").read_text(encoding="utf-8")
+    names = ["adjustmentsAllowedInTotals", "adjustmentNetMargin", "summary", "totalSummary"]
+    functions = "\n".join(re.search(r"    function " + name + r"\([^\n]*\) \{.*?\n    \}", html, re.S).group(0) for name in names)
+    script = """
+const assert = require('node:assert/strict');
+let filters={}, selectedProvince=null, selectedCity=null;
+const selectedValues=k=>filters[k]||null;
+const document={getElementById:()=>({value:''})};
+const MONTH_ORDER=['7月','8月']; const yoy=(a,b)=>a/b-1;
+const NET_CONTRIBUTION_ADJUSTMENTS=[{y:'2025',mo:'8月',nm:-9.052},{y:'2026',mo:'8月',nm:20}];
+""" + functions + """
+const rows=[{y:'2025',nm:100,inc:1000},{y:'2026',nm:200,inc:2000}];
+assert.ok(Math.abs(totalSummary(rows,'nm',['8月']).v25-90.948)<1e-9);
+assert.equal(totalSummary(rows,'nm',['8月']).v26,220);
+assert.equal(totalSummary(rows,'nm',['7月']).v25,100);
+assert.equal(totalSummary(rows,'inc',['8月']).v25,1000);
+assert.equal(summary(rows,'nm').v25,100);
+for(const key of ['categoryFilter','channelFilter']) { filters={[key]:['chosen']}; assert.equal(totalSummary(rows,'nm').v25,100); }
+filters={}; selectedProvince='江苏省'; assert.equal(totalSummary(rows,'nm').v25,100);
+"""
+    result = subprocess.run(["node", "-e", script], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
 
 
 def test_total_net_margin_adds_adjustment_without_changing_rate() -> None:
