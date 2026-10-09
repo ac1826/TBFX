@@ -1,10 +1,14 @@
 import sys
+import json
+import shutil
+import subprocess
 from pathlib import Path
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import pandas as pd
+import pytest
 
 from tools.update_dashboard_data import (
     YOY_CHANNEL_ORDER,
@@ -20,6 +24,59 @@ from tools.update_dashboard_data import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_yoy_requested_panel_notes_are_removed() -> None:
+    text = (ROOT / "streamlit_html_portal/static/2026-vs-2025-yoy-dashboard.html").read_text(encoding="utf-8")
+    for title in ("C. 渠道结构同比树图", "D. 品类结构同比树图", "E. 客户贡献变化",
+                  "F. 月度同比走势", "G. 品类贡献变化", "H. 物料贡献变化"):
+        assert f'<div class="panel-head"><h2>{title}</h2></div>' in text
+
+
+def test_structure_treemaps_display_share_and_yoy_for_every_node() -> None:
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node is required to execute the dashboard label formatter")
+    text = (ROOT / "streamlit_html_portal/static/2026-vs-2025-yoy-dashboard.html").read_text(encoding="utf-8")
+    start = text.index("    function renderStructureTreemap(")
+    end = text.index("    function renderChannelShareChart(", start)
+    script = """
+const TREEMAP_COLORS=['#5470c6'];
+const treemapTextColor=()=> '#fff';
+const VIZ={tooltipBg:'#fff'};
+const fmt=n=>String(n), signed=n=>String(n), deltaColor=()=> '#fff';
+const pct=n=>Number.isFinite(n)?(n*100).toFixed(1)+'%':'-';
+const signedPct=n=>Number.isFinite(n)?(n*100).toFixed(1)+'%':'-';
+const tooltipBox=lines=>lines.join('\n');
+""".replace("join('\n')", "join('\\n')") + text[start:end] + """
+let option;
+let textStyle;
+const label={setStyle:s=>textStyle=s};
+const rect={shape:{width:200,height:300},getTextContent:()=>label};
+const chart={setOption:o=>option=o,on:()=>{},off:()=>{},getZr:()=>({storage:{getDisplayList:()=>[rect]},refresh:()=>{}})};
+const data=[{label:'A',v25:40,v26:60,delta:20,yoy:0.5},{label:'B',v25:60,v26:40,delta:-20,yoy:-1/3}];
+renderStructureTreemap(chart,data,'渠道',true);
+const s=option.series[0];
+const labels=s.data.map(d=>s.label.formatter({data:d}));
+const tips=s.data.map(d=>option.tooltip.formatter({data:d}));
+const centeredStyle=textStyle;
+const nodeLabel=s.data[0].label;
+renderStructureTreemap(chart,[{label:'zero',v26:0,v25:1,delta:-1,yoy:-1}],'品类',true);
+console.log(JSON.stringify({shares:s.data.map(d=>d.share26),labels,tips,layout:s.labelLayout,nodeLabel,centeredStyle,visibleMin:s.visibleMin,zeroLabel:option.series[0].label.formatter({data:option.series[0].data[0]})}));
+"""
+    result = json.loads(subprocess.check_output([node, "-e", script], text=True, encoding="utf-8"))
+    assert result["shares"] == [0.6, 0.4]
+    assert "占比 60.0%" in result["labels"][0]
+    assert "占比 40.0%" in result["labels"][1]
+    assert all("同比 " in label and label.count("\n") == 3 for label in result["labels"])
+    assert "2026结构占比：60.0%" in result["tips"][0]
+    assert result["layout"] == {"align": "center", "verticalAlign": "middle", "hideOverlap": False}
+    assert result["centeredStyle"]["height"] == 88
+    assert result["nodeLabel"] == {"position": "inside", "align": "center", "verticalAlign": "middle"}
+    assert result["centeredStyle"]["align"] == "center"
+    assert result["centeredStyle"]["verticalAlign"] == "middle"
+    assert result["visibleMin"] == 0
+    assert "占比 -" in result["zeroLabel"]
 
 
 def test_rka_perimeter_is_comparable_without_moving_other_7550_customers() -> None:
