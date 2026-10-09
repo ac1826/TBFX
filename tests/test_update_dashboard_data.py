@@ -36,7 +36,7 @@ def test_month_cn_keeps_plain_month_values() -> None:
 
 
 def test_dashboard_filter_orders_include_latest_month_and_eight_channels() -> None:
-    assert YOY_MONTH_ORDER == [f"{month}月" for month in range(1, 9)]
+    assert YOY_MONTH_ORDER == [f"{month}月" for month in range(1, 10)]
     assert YOY_CHANNEL_ORDER == ["烘焙", "休闲", "团膳", "宴席", "零售", "KA", "鲜食工厂", "其他"]
 
 

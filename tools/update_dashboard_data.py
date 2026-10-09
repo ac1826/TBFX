@@ -21,14 +21,14 @@ YOY_STATIC = STATIC_DIR / "2026-vs-2025-yoy-dashboard.html"
 
 F_DIR = Path("F:/llqdocument/大成文件/客户贡献分析")
 SOURCE_2026_NAME = "PFS 26年毛利表1-9月含电商 TOP20新版.xlsx"
-SOURCE_2025_NAME = "PFS 25年毛利表1-8月 含电商 TOP20 -品项实际 新版.xlsx"
+SOURCE_2025_NAME = "PFS 25年毛利表1-9月 含电商 TOP20 -品项实际 新版.xlsx"
 # Compare only periods supported by both annual workbooks.
-YOY_MONTH_ORDER = [f"{month}月" for month in range(1, 9)]
+YOY_MONTH_ORDER = [f"{month}月" for month in range(1, 10)]
 YOY_CHANNEL_ORDER = ["烘焙", "休闲", "团膳", "宴席", "零售", "KA", "鲜食工厂", "其他"]
 CUSTOMER_MASTER_NAME = "7月客户渠道及合并汇总.xlsx"
 CHANNEL_CLASSIFICATION_NAME = "渠道分类.xlsx"
 ORG_MASTER_NAME = "销售办事处组织架构及渠道.xlsx"
-CUSTOMER_LIST_NAME = "客户清单.xlsx"
+CUSTOMER_LIST_NAME = "客户清单_10月.xlsx"
 CUSTOMER_MAPPING_SUPPLEMENT_NAME = "清单1.xlsx"
 REFERENCE_HTML_NAME = "2026年1-6月主次渠道分析仪表盘.html"
 SALES_SOURCE_HTML = F_DIR / "2026年1-9月数据分析仪表盘.html"
@@ -147,11 +147,11 @@ def extract_app_data(text: str) -> tuple[int, int, dict[str, Any]]:
 
 def replace_app_data(path: Path, data: dict[str, Any]) -> None:
     text = path.read_text(encoding="utf-8", errors="replace")
-    if path == YOY_STATIC and "2025年明细截至8月" not in text:
+    if path == YOY_STATIC:
         text = text.replace(
-            "围绕销量、销额、净边贡，定位增长来源和下滑来源",
-            "围绕销量、销额、净边贡，定位增长来源和下滑来源。2025年明细截至8月，同比仅比较双方都有数据的1—8月。",
+            "。2025年明细截至8月，同比仅比较双方都有数据的1—8月。", "",
         )
+        text = text.replace("2026年1-8月累计同比2025年分析", "2026年1-9月累计同比2025年分析")
     start, end, _ = extract_app_data(text)
     payload = json.dumps(data, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
     path.write_text(text[:start] + payload + text[end:], encoding="utf-8")
@@ -480,7 +480,7 @@ def build_lookup_context(region_master: Path) -> dict[str, Any]:
     )
     canonical_region = load_26_01_region_map(region_master)
     name_dimension_index = build_name_consensus_dimension_index(
-        [F_DIR / CUSTOMER_MAPPING_SUPPLEMENT_NAME]
+        [F_DIR / CUSTOMER_LIST_NAME]
     )
     org_customers, org_sales_region_provinces, org_sales_region_cities = load_org_customer_supplements(
         F_DIR / ORG_MASTER_NAME
@@ -578,6 +578,21 @@ def build_lookup_context(region_master: Path) -> dict[str, Any]:
             geo["ct"] = city
         if province and not geo.get("p"):
             geo["p"] = province
+    # The current customer list supplies explicit geography by customer ID.
+    for row in customer_list.to_dict("records"):
+        customer = clean_code(row.get("客户"))
+        if not customer:
+            continue
+        sales_region = clean_str(row.get("销售地区"))
+        city = clean_str(row.get("城市")) or city_from_sales_region(sales_region, org_sales_region_cities)
+        province = province_from_sales_region(sales_region) or province_from_city(city, org_sales_region_provinces)
+        geo = canonical_geo.setdefault(customer, {})
+        if city:
+            geo["ct"] = city
+        if province:
+            geo["p"] = province
+        if sales_region:
+            sales_regions[customer] = sales_region
     return {
         "canonical_channel": canonical_channel,
         "user_rka_2026": USER_CONFIRMED_RKA_2026,
@@ -1228,8 +1243,11 @@ def main() -> None:
     sales_records = build_sales_records(detail_2026, context)
     detail_2025, adjustment_rows_2025 = split_office_adjustments_2026(clean_2025, 2025)
     adjustments_2025 = build_office_adjustments_2026(adjustment_rows_2025, context, 2025)
-    if len(adjustments_2025) != 2 or not math.isclose(sum(row["nm"] for row in adjustments_2025), -9.052, abs_tol=1e-6):
-        raise ValueError("2025 office adjustments must reconcile to 2 rows / -9.052 thousand")
+    if len(adjustments_2025) != 8 or not math.isclose(sum(row["nm"] for row in adjustments_2025), 15.93947, abs_tol=1e-6):
+        raise ValueError(
+            f"2025 office adjustments: rows={len(adjustments_2025)}, "
+            f"net={sum(row['nm'] for row in adjustments_2025)}; expected 8 rows / 15.93947 thousand"
+        )
     yoy_adjustments = adjustments_2025 + adjustments
     yoy_raw = build_yoy_rows_2025(detail_2025, context) + build_yoy_rows_2026(detail_2026, context)
     yoy_raw = [row for row in yoy_raw if row["mo"] in YOY_MONTH_ORDER]
