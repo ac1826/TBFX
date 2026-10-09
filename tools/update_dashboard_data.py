@@ -465,6 +465,7 @@ def build_lookup_context(region_master: Path) -> dict[str, Any]:
         build_name_consensus_dimension_index,
         build_strict_dimension_maps,
         USER_CONFIRMED_RKA_2026,
+        USER_CONFIRMED_GEO_2026,
         resolve_name_consensus_dimensions,
     )
 
@@ -596,6 +597,7 @@ def build_lookup_context(region_master: Path) -> dict[str, Any]:
     return {
         "canonical_channel": canonical_channel,
         "user_rka_2026": USER_CONFIRMED_RKA_2026,
+        "user_confirmed_geo_2026": USER_CONFIRMED_GEO_2026,
         "canonical_region": canonical_region,
         "canonical_geo": canonical_geo,
         "customer_names": customer_names,
@@ -724,6 +726,7 @@ def enrich_sales(record: dict[str, Any], context: dict[str, Any], year: int = 20
     org_customer = context["org_customers"].get(cid) or {}
     reference = context["reference_maps"].get(cid) or {}
     researched = RESEARCHED_GEO.get(cid) or {}
+    confirmed_geo = context.get("user_confirmed_geo_2026", {}).get(cid, {}) if year == 2026 else {}
     if year != 2026 and cid in context.get("user_rka_2026", ()):
         researched = {}
     code = office_code(office)
@@ -732,7 +735,8 @@ def enrich_sales(record: dict[str, Any], context: dict[str, Any], year: int = 20
     merged_geo = context["canonical_geo"].get(merged_id) or {}
     merged_org_customer = context["org_customers"].get(merged_id) or {}
     primary_city = (
-        geo.get("ct")
+        confirmed_geo.get("city")
+        or geo.get("ct")
         or context["customer_cities"].get(cid)
         or org_customer.get("city")
         or merged_geo.get("ct")
@@ -744,7 +748,7 @@ def enrich_sales(record: dict[str, Any], context: dict[str, Any], year: int = 20
     primary_province = (
         "山东省"
         if code == "7420"
-        else geo.get("p") or merged_geo.get("p") or reference.get("p") or researched.get("p")
+        else confirmed_geo.get("province") or geo.get("p") or merged_geo.get("p") or reference.get("p") or researched.get("p")
     )
     primary_channel = (
         "电商"

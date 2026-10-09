@@ -100,6 +100,23 @@ def test_rka_customer_override_is_year_scoped_and_keeps_identity() -> None:
     assert enrich_sales(row, context, 2026)["ch"] == "电商"
 
 
+def test_confirmed_geography_overrides_old_location_without_changing_channel_or_identity() -> None:
+    context = {key: {} for key in (
+        "canonical_geo", "customer_cities", "org_customers", "reference_maps",
+        "canonical_region", "merged_customers", "canonical_channel", "customer_names",
+        "listed_names", "name_dimension_index",
+    )}
+    context["canonical_geo"] = {"274749": {"p": "江苏省", "ct": "苏州"}}
+    context["canonical_channel"] = {"274749": "KA"}
+    context["user_confirmed_geo_2026"] = {"274749": {"province": "浙江省", "city": "金华"}}
+    context["resolve_name_dimensions"] = lambda *_: {"status": "no_candidate"}
+    row = {"客户编码": "274749", "客户描述": "利她（义乌）餐饮管理有限公司", "销售办事处": "7350 RKA"}
+    current = enrich_sales(row, context, 2026)
+    previous = enrich_sales(row, context, 2025)
+    assert (current["p"], current["ct"], current["ch"], current["mcid"]) == ("浙江省", "金华", "KA", "274749")
+    assert (previous["p"], previous["ct"]) == ("江苏省", "苏州")
+
+
 def test_generated_enjoydelai_name_consensus_mapping_keeps_customer_ids() -> None:
     expected = {
         "274770", "274771", "274775", "274781", "274782",
