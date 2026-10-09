@@ -61,11 +61,16 @@ const labels=s.data.map(d=>s.label.formatter({data:d}));
 const tips=s.data.map(d=>option.tooltip.formatter({data:d}));
 const centeredStyle=textStyle;
 const nodeLabel=s.data[0].label;
+const labelColors=Object.values(s.label.rich).map(style=>style.color);
 renderStructureTreemap(chart,[{label:'zero',v26:0,v25:1,delta:-1,yoy:-1}],'品类',true);
-console.log(JSON.stringify({shares:s.data.map(d=>d.share26),labels,tips,layout:s.labelLayout,nodeLabel,centeredStyle,visibleMin:s.visibleMin,zeroLabel:option.series[0].label.formatter({data:option.series[0].data[0]})}));
+console.log(JSON.stringify({shares:s.data.map(d=>d.share26),styles:s.data.map(d=>d.itemStyle),gapWidth:s.itemStyle.gapWidth,labelColors,labels,tips,layout:s.labelLayout,nodeLabel,centeredStyle,visibleMin:s.visibleMin,zeroLabel:option.series[0].label.formatter({data:option.series[0].data[0]})}));
 """
     result = json.loads(subprocess.check_output([node, "-e", script], text=True, encoding="utf-8"))
     assert result["shares"] == [0.6, 0.4]
+    assert [style["color"] for style in result["styles"]] == ["#159b76", "#e58b28"]
+    assert all(style["borderColor"] == "#fff" and style["borderWidth"] == 2 for style in result["styles"])
+    assert result["gapWidth"] == 2
+    assert result["labelColors"] == ["#000"] * 5
     assert "占比 60.0%" in result["labels"][0]
     assert "占比 40.0%" in result["labels"][1]
     assert all("同比 " in label and label.count("\n") == 3 for label in result["labels"])
