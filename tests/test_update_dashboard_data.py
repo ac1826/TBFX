@@ -22,6 +22,25 @@ from tools.update_dashboard_data import (
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_rka_perimeter_is_comparable_without_moving_other_7550_customers() -> None:
+    sys.path.insert(0, str(ROOT.parent / "pfs-profitability-dashboard"))
+    from src.pipeline import comparable_region_2026
+    context = {key: {} for key in (
+        "canonical_geo", "customer_cities", "org_customers", "reference_maps",
+        "merged_customers", "canonical_channel", "customer_names", "listed_names", "name_dimension_index",
+    )}
+    context.update(canonical_region={"7550": "华东区", "7559": "RKA"},
+                   comparable_region_2026=comparable_region_2026, tastien_customers={"tst"},
+                   resolve_name_dimensions=lambda *_: {"status": "no_candidate"})
+    row = {"客户编码": "tst", "客户描述": "塔斯汀", "销售办事处": "7550 福建餐饮"}
+    assert enrich_sales(row, context, 2025)["nr"] == "RKA"
+    assert enrich_sales(row, context, 2025)["mcid"] == "tst"
+    row["客户编码"] = "other"
+    assert enrich_sales(row, context, 2025)["nr"] == "华东区"
+    row["销售办事处"] = "7559 KA TST"
+    assert enrich_sales(row, context, 2026)["nr"] == "RKA"
+
+
 def test_month_cn_normalizes_short_year_month_codes() -> None:
     assert month_cn("2501月", "2025") == "1月"
     assert month_cn("2507", "2025") == "7月"

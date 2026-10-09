@@ -19,6 +19,8 @@ py -3 -m streamlit run app.py
 
 ## 文件说明
 
+大区同比采用统一2026年RKA范围：两年均纳入7350、7559及明确塔斯汀品牌账户，2025年7550的其他客户仍归华东区。3005排除、7420、渠道、客户合并及金额口径保持不变。共享规则来自PFS数据管道，刷新脚本会同时更新两个HTML。
+
 - `app.py`：Streamlit 入口页面，提供两个看板入口，并在 Streamlit 内渲染 HTML。
 - `static/2026-sales-dashboard.html`：2026年销售数据看板。
 - `static/2026-vs-2025-yoy-dashboard.html`：2026 vs 2025 同比分析。

@@ -467,6 +467,8 @@ def build_lookup_context(region_master: Path) -> dict[str, Any]:
         USER_CONFIRMED_RKA_2026,
         USER_CONFIRMED_GEO_2026,
         resolve_name_consensus_dimensions,
+        comparable_region_2026,
+        load_tastien_brand_customers,
     )
 
     canonical_channel, _ = build_strict_dimension_maps(
@@ -599,6 +601,8 @@ def build_lookup_context(region_master: Path) -> dict[str, Any]:
         "user_rka_2026": USER_CONFIRMED_RKA_2026,
         "user_confirmed_geo_2026": USER_CONFIRMED_GEO_2026,
         "canonical_region": canonical_region,
+        "comparable_region_2026": comparable_region_2026,
+        "tastien_customers": load_tastien_brand_customers(F_DIR / CUSTOMER_MASTER_NAME),
         "canonical_geo": canonical_geo,
         "customer_names": customer_names,
         "customer_cities": customer_cities,
@@ -781,6 +785,9 @@ def enrich_sales(record: dict[str, Any], context: dict[str, Any], year: int = 20
     if code == "7420":
         city = "德州"
     region = canonical_region or UNMAPPED
+    region_resolver = context.get("comparable_region_2026")
+    if region_resolver is not None:
+        region = region_resolver(year, code, cid, region, context.get("tastien_customers", set()))
     return {
         "p": province,
         "ct": city,
@@ -1108,6 +1115,7 @@ def write_unmapped_report(
 
 def update_quality_sales(data: dict[str, Any], records: list[dict[str, Any]], adjustments: list[dict[str, Any]], source_2026: Path, stats_2026: dict[str, Any]) -> None:
     quality = data.setdefault("quality", {})
+    quality["comparable_region_rule"] = "两年统一2026年RKA范围：7350、7559及塔斯汀品牌账户归RKA；7550其他客户不迁移；3005及7420特殊口径不变"
     quality["period"] = "2026.01-2026.09"
     quality["source"] = str(source_2026)
     quality["income_metric_source"] = "销售额（含税销额）"
@@ -1154,6 +1162,7 @@ def update_quality_sales(data: dict[str, Any], records: list[dict[str, Any]], ad
 
 def update_quality_yoy(data: dict[str, Any], records: list[dict[str, Any]], adjustments: list[dict[str, Any]], source_2025: Path, source_2026: Path, stats_2025: dict[str, Any], stats_2026: dict[str, Any]) -> None:
     quality = data.setdefault("quality", {})
+    quality["comparable_region_rule"] = "两年统一2026年RKA范围：7350、7559及塔斯汀品牌账户归RKA；7550其他客户不迁移；3005及7420特殊口径不变"
     quality["source_2025"] = str(source_2025)
     quality["source_2026"] = str(source_2026)
     quality["income_metric_source_2026"] = "销售额（含税销额）"
