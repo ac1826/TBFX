@@ -277,7 +277,7 @@ def inject_customer_yoy(html: str) -> str:
     yoy_data = extract_app_data(yoy_path.read_text(encoding="utf-8", errors="replace"))
     fields = {"y", "mo", "cat", "item", "ch", "nr", "pc", "mcn", "mcid", "o", "p", "ct", "v", "inc", "nm", "ni", "ad"}
     prior_rows = [{key: row.get(key) for key in fields if key in row} for row in yoy_data.get("records", []) if row.get("y") == "2025"]
-    payload = json.dumps(prior_rows, ensure_ascii=False, separators=(",", ":")).replace("</", "<\/")
+    payload = json.dumps(prior_rows, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
     marker = "    fetch('2026-vs-2025-yoy-dashboard.html').then(response => {"
     start = html.find(marker)
     if start < 0:

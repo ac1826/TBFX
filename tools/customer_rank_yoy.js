@@ -40,7 +40,7 @@ function customerRankYoyRuntime(priorRows) {
         `净边贡：${display(r.net_margin_k,'net_margin_k')}　同比：${value('net_margin_k')}<br/>` +
         `净边贡率：${display(r.net_margin_rate,'net_margin_rate')}　同比：${value('net_margin_rate')}<br/>` +
         `SKU数：${(r.sku_cnt || 0).toLocaleString('zh-CN')}　同比：${value('sku_cnt')}`;
-    } } });
+    } } }, true);
   };
   renderCustomerRank(currentRows());
 }
