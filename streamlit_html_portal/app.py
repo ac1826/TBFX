@@ -275,9 +275,36 @@ def extract_app_data(text: str) -> dict:
 def inject_customer_yoy(html: str) -> str:
     yoy_path = dashboard_file("yoy")
     yoy_data = extract_app_data(yoy_path.read_text(encoding="utf-8", errors="replace"))
-    fields = {"y", "mo", "cat", "item", "ch", "nr", "pc", "mcn", "mcid", "o", "p", "ct", "v", "inc", "nm", "ni", "ad"}
-    prior_rows = [{key: row.get(key) for key in fields if key in row} for row in yoy_data.get("records", []) if row.get("y") == "2025"]
-    payload = json.dumps(prior_rows, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+    aggregates = {}
+    for row in yoy_data.get("records", []):
+        if row.get("y") != "2025":
+            continue
+        customer_id = str(row.get("mcid") or row.get("mcn") or "")
+        if not customer_id:
+            continue
+        item = aggregates.setdefault(customer_id, {
+            "mcid": customer_id, "mcn": row.get("mcn") or customer_id,
+            "volume_ton": 0.0, "income_k": 0.0, "net_income_k": 0.0,
+            "net_margin_k": 0.0, "allocated_discount_k": 0.0, "skus": set(),
+        })
+        item["volume_ton"] += float(row.get("v") or 0)
+        item["income_k"] += float(row.get("inc") or 0)
+        item["net_income_k"] += float(row.get("ni") or 0)
+        item["net_margin_k"] += float(row.get("nm") or 0)
+        item["allocated_discount_k"] += float(row.get("ad") or 0)
+        item["skus"].add(str(row.get("pc") or ""))
+    prior_rows = []
+    for item in aggregates.values():
+        base = item["net_income_k"] - item["allocated_discount_k"]
+        prior_rows.append({
+            "mcid": item["mcid"], "mcn": item["mcn"],
+            "volume_ton": item["volume_ton"], "income_k": item["income_k"],
+            "net_income_k": item["net_income_k"], "net_margin_k": item["net_margin_k"],
+            "allocated_discount_k": item["allocated_discount_k"],
+            "net_margin_rate": item["net_margin_k"] / base if base else 0,
+            "sku_cnt": len(item["skus"]),
+        })
+    payload = json.dumps({"aggregated": True, "rows": prior_rows}, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
     marker = "    fetch('2026-vs-2025-yoy-dashboard.html').then(response => {"
     start = html.find(marker)
     if start < 0:

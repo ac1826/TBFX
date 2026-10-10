@@ -542,7 +542,9 @@ function customerRankYoyRuntime(priorRows) {
       (!regions.length || regions.includes(r.nr)) &&
       (!kw || `${r.pc} ${r.pn} ${r.mcn} ${r.mcid} ${r.o} ${r.nr}`.toLowerCase().includes(kw))
     );
-    const prior = new Map(groupBy(currentScopeRows(filteredPrior), ['mcid']).map(r => [r.mcid, r]));
+    const prior = priorRows && priorRows.aggregated
+      ? new Map((priorRows.rows || []).map(r => [r.mcid, r]))
+      : new Map(groupBy(currentScopeRows(filteredPrior), ['mcid']).map(r => [r.mcid, r]));
     const current = topBy(groupBy(currentScopeRows(rows), ['mcid']), activeMetric, 20).reverse();
     const keys = ['volume_ton', 'income_k', 'net_margin_k', 'net_margin_rate', 'sku_cnt'];
     const display = (value, key) => typeof fmt === 'function' ? fmt(value, key) : key === 'net_margin_rate' ? `${(Number(value || 0) * 100).toFixed(1)}%` : Number(value || 0).toLocaleString('zh-CN');
