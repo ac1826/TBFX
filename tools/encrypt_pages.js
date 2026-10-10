@@ -10,6 +10,7 @@ if (!password) {
 }
 
 const root = path.resolve(__dirname, "..");
+const customerRankYoySource = fs.readFileSync(path.join(__dirname, "customer_rank_yoy.js"), "utf8");
 const sourcePages = [
   {
     id: "single2026",
@@ -616,6 +617,7 @@ function buildPortalShell(payload) {
       }
     }
 
+${customerRankYoySource}
     async function openDashboard(id) {
       const page = pageById(id);
       statusEl.textContent = "";
@@ -625,7 +627,11 @@ function buildPortalShell(payload) {
         portalView.classList.remove("active");
         lockedView.style.display = "none";
         dashboardView.classList.add("active");
-        const html = await decryptPage(unlockedPassword, page);
+        let html = await decryptPage(unlockedPassword, page);
+        if (page.id === 'single2026') {
+          const yoyHtml = await decryptPage(unlockedPassword, pageById('yoy'));
+          html = withCustomerRankYoy(html, customerRankYoyData(yoyHtml));
+        }
         if (activeDashboardUrl) URL.revokeObjectURL(activeDashboardUrl);
         activeDashboardUrl = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
         dashboardTitle.textContent = page.title;
