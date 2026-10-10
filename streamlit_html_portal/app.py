@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -244,6 +245,49 @@ def render_portal() -> None:
     st.markdown(portal_html, unsafe_allow_html=True)
 
 
+def extract_app_data(text: str) -> dict:
+    marker = "const APP_DATA = "
+    start = text.index(marker) + len(marker)
+    depth = 0
+    in_string = False
+    escaped = False
+    for pos in range(start, len(text)):
+        char = text[pos]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return json.loads(text[start:pos + 1])
+    raise ValueError("APP_DATA JSON end not found")
+
+
+def inject_customer_yoy(html: str) -> str:
+    yoy_path = dashboard_file("yoy")
+    yoy_data = extract_app_data(yoy_path.read_text(encoding="utf-8", errors="replace"))
+    fields = {"y", "mo", "cat", "item", "ch", "nr", "pc", "mcn", "mcid", "o", "p", "ct", "v", "inc", "nm", "ni", "ad"}
+    prior_rows = [{key: row.get(key) for key in fields if key in row} for row in yoy_data.get("records", []) if row.get("y") == "2025"]
+    payload = json.dumps(prior_rows, ensure_ascii=False, separators=(",", ":")).replace("</", "<\/")
+    marker = "    fetch('2026-vs-2025-yoy-dashboard.html').then(response => {"
+    start = html.find(marker)
+    if start < 0:
+        return html
+    end = html.find("    window.addEventListener('resize'", start)
+    if end < 0:
+        return html
+    return html[:start] + f"    customerRankYoyRuntime({payload});\n" + html[end:]
+
+
 def render_dashboard(dashboard_key: str) -> None:
     dashboard = DASHBOARDS[dashboard_key]
     path = dashboard_file(dashboard_key)
@@ -258,6 +302,8 @@ def render_dashboard(dashboard_key: str) -> None:
     if st.button("返回选择看板"):
         go_home()
     html = path.read_text(encoding="utf-8", errors="replace")
+    if dashboard_key == "sales":
+        html = inject_customer_yoy(html)
     components.html(html, height=1200, scrolling=True)
 
 
