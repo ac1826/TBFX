@@ -545,6 +545,7 @@ function customerRankYoyRuntime(priorRows) {
     const prior = new Map(groupBy(currentScopeRows(filteredPrior), ['mcid']).map(r => [r.mcid, r]));
     const current = topBy(groupBy(currentScopeRows(rows), ['mcid']), activeMetric, 20).reverse();
     const keys = ['volume_ton', 'income_k', 'net_margin_k', 'net_margin_rate', 'sku_cnt'];
+    const display = (value, key) => typeof fmt === 'function' ? fmt(value, key) : Number(value || 0).toLocaleString('zh-CN');
     const change = (now, before, rate) => {
       if (rate) {
         const delta = (now - before) * 100;
@@ -559,10 +560,10 @@ function customerRankYoyRuntime(priorRows) {
       const old = prior.get(r.mcid);
       const value = key => old ? change(r[key], old[key], key === 'net_margin_rate') : '2025无数据';
       return `${r.customerName || r.mcn || r.mcid || params[0].name}<br/>` +
-        `销量：${fmt(r.volume_ton,'volume_ton')}　同比：${value('volume_ton')}<br/>` +
-        `销额：${fmt(r.income_k,'income_k')}　同比：${value('income_k')}<br/>` +
-        `净边贡：${fmt(r.net_margin_k,'net_margin_k')}　同比：${value('net_margin_k')}<br/>` +
-        `净边贡率：${fmt(r.net_margin_rate,'net_margin_rate')}　同比：${value('net_margin_rate')}<br/>` +
+        `销量：${display(r.volume_ton,'volume_ton')}　同比：${value('volume_ton')}<br/>` +
+        `销额：${display(r.income_k,'income_k')}　同比：${value('income_k')}<br/>` +
+        `净边贡：${display(r.net_margin_k,'net_margin_k')}　同比：${value('net_margin_k')}<br/>` +
+        `净边贡率：${display(r.net_margin_rate,'net_margin_rate')}　同比：${value('net_margin_rate')}<br/>` +
         `SKU数：${(r.sku_cnt || 0).toLocaleString('zh-CN')}　同比：${value('sku_cnt')}`;
     } } });
   };
