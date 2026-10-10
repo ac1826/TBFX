@@ -26,7 +26,7 @@ function customerRankYoyRuntime(priorRows) {
     const change = (now, before, rate) => {
       if (rate) {
         const delta = (now - before) * 100;
-        return `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}个百分点`;
+        return `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%`;
       }
       if (!before) return now ? '2025为0，无法计算' : '0.0%';
       const delta = (now - before) / Math.abs(before) * 100;

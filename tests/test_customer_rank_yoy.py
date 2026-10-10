@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_customer_tooltip_yoy_respects_filters_and_distinct_skus():
-    html = (ROOT / 'streamlit_html_portal/static/2026-sales-dashboard.html').read_text()
+    html = (ROOT / 'streamlit_html_portal/static/2026-sales-dashboard.html').read_text(encoding='utf-8')
     aggregation = html[html.index('    function sumRows('):html.index('    function topBy(')]
     rate = html[html.index('    function netMarginRate('):html.index('    function metricValue(')]
     script = r'''
@@ -30,7 +30,7 @@ const result=formatter([{dataIndex:0}]);
 if(!result.includes('销量：30　同比：+50.0%'))throw Error(result);
 if(!result.includes('销额：300　同比：+50.0%'))throw Error(result);
 if(!result.includes('净边贡：90　同比：+125.0%'))throw Error(result);
-if(!result.includes('净边贡率：30.0%　同比：+10.0个百分点'))throw Error(result);
+if(!result.includes('净边贡率：30.0%　同比：+10.0%'))throw Error(result);
 if(!result.includes('SKU数：1　同比：+0.0%'))throw Error(result);
 filters.monthFilter=['2026.02'];renderCustomerRank(now);
 if(!formatter([{dataIndex:0}]).includes('2025为0，无法计算')) {
@@ -45,4 +45,4 @@ const patched=withCustomerRankYoy('<body></body>',[{...base,mcn:'</script>'}]);
 if(patched.includes('"mcn":"</script>"'))throw Error('Unescaped script data');
 console.log(JSON.stringify({result}));
 '''
-    subprocess.check_output(['node', '-e', script], cwd=ROOT, text=True)
+    subprocess.check_output(['node', '-e', script], cwd=ROOT, text=True, encoding='utf-8')
