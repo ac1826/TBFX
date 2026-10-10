@@ -276,14 +276,20 @@ def inject_customer_yoy(html: str) -> str:
     baseline_path = STATIC_DIR / "customer-yoy-baseline.json"
     prior_rows = json.loads(baseline_path.read_text(encoding="utf-8"))
     payload = json.dumps(prior_rows, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+    runtime = f"    customerRankYoyRuntime({payload});\n"
     marker = "    fetch('2026-vs-2025-yoy-dashboard.html').then(response => {"
     start = html.find(marker)
-    if start < 0:
-        return html
-    end = html.find("    window.addEventListener('resize'", start)
-    if end < 0:
-        return html
-    return html[:start] + f"    customerRankYoyRuntime({payload});\n" + html[end:]
+    if start >= 0:
+        end = html.find("    window.addEventListener('resize'", start)
+        if end >= 0:
+            return html[:start] + runtime + html[end:]
+
+    # Streamlit can serve a transformed/minified copy where the exact fetch
+    # block is no longer present. Keep the comparison data self-contained by
+    # appending the runtime call before the closing body tag.
+    if "customerRankYoyRuntime(" in html:
+        return html.replace("</body>", f"<script>\n{runtime}</script>\n</body>", 1)
+    return html
 
 
 def render_dashboard(dashboard_key: str) -> None:
