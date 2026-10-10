@@ -545,7 +545,7 @@ function customerRankYoyRuntime(priorRows) {
     const prior = new Map(groupBy(currentScopeRows(filteredPrior), ['mcid']).map(r => [r.mcid, r]));
     const current = topBy(groupBy(currentScopeRows(rows), ['mcid']), activeMetric, 20).reverse();
     const keys = ['volume_ton', 'income_k', 'net_margin_k', 'net_margin_rate', 'sku_cnt'];
-    const display = (value, key) => typeof fmt === 'function' ? fmt(value, key) : Number(value || 0).toLocaleString('zh-CN');
+    const display = (value, key) => typeof fmt === 'function' ? fmt(value, key) : key === 'net_margin_rate' ? `${(Number(value || 0) * 100).toFixed(1)}%` : Number(value || 0).toLocaleString('zh-CN');
     const change = (now, before, rate) => {
       if (rate) {
         const delta = (now - before) * 100;
