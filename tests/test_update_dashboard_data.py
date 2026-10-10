@@ -62,8 +62,9 @@ const tips=s.data.map(d=>option.tooltip.formatter({data:d}));
 const centeredStyle=textStyle;
 const nodeLabel=s.data[0].label;
 const labelColors=Object.values(s.label.rich).map(style=>style.color);
+const labelWeights=[s.label.fontWeight,...Object.values(s.label.rich).map(style=>style.fontWeight)];
 renderStructureTreemap(chart,[{label:'zero',v26:0,v25:1,delta:-1,yoy:-1}],'品类',true);
-console.log(JSON.stringify({shares:s.data.map(d=>d.share26),styles:s.data.map(d=>d.itemStyle),gapWidth:s.itemStyle.gapWidth,labelColors,labels,tips,layout:s.labelLayout,nodeLabel,centeredStyle,visibleMin:s.visibleMin,zeroLabel:option.series[0].label.formatter({data:option.series[0].data[0]})}));
+console.log(JSON.stringify({shares:s.data.map(d=>d.share26),styles:s.data.map(d=>d.itemStyle),gapWidth:s.itemStyle.gapWidth,labelColors,labelWeights,labels,tips,layout:s.labelLayout,nodeLabel,centeredStyle,visibleMin:s.visibleMin,zeroLabel:option.series[0].label.formatter({data:option.series[0].data[0]})}));
 """
     result = json.loads(subprocess.check_output([node, "-e", script], text=True, encoding="utf-8"))
     assert result["shares"] == [0.6, 0.4]
@@ -71,9 +72,11 @@ console.log(JSON.stringify({shares:s.data.map(d=>d.share26),styles:s.data.map(d=
     assert all(style["borderColor"] == "#fff" and style["borderWidth"] == 2 for style in result["styles"])
     assert result["gapWidth"] == 2
     assert result["labelColors"] == ["#000"] * 5
+    assert result["labelWeights"] == [400] * 6
     assert "占比 60.0%" in result["labels"][0]
     assert "占比 40.0%" in result["labels"][1]
     assert all("同比 " in label and label.count("\n") == 3 for label in result["labels"])
+    assert all("同比 " in label.split("\n")[2] and "占比 " in label.split("\n")[3] for label in result["labels"])
     assert "2026结构占比：60.0%" in result["tips"][0]
     assert result["layout"] == {"align": "center", "verticalAlign": "middle", "hideOverlap": False}
     assert result["centeredStyle"]["height"] == 88
