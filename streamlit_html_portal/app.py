@@ -276,6 +276,12 @@ def inject_customer_yoy(html: str) -> str:
     baseline_path = STATIC_DIR / "customer-yoy-baseline.json"
     prior_rows = json.loads(baseline_path.read_text(encoding="utf-8"))
     payload = json.dumps(prior_rows, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+    # Keep the portal independent from the copy of this helper embedded in the
+    # large static HTML.  That copy is historical and can be stale after a
+    # data refresh; the checked-in helper contains the aggregated-baseline fix.
+    helper_path = Path(__file__).parents[1] / "tools" / "customer_rank_yoy.js"
+    helper = helper_path.read_text(encoding="utf-8").split("\nif (typeof module !== 'undefined')", 1)[0]
+    helper = helper.replace("function customerRankYoyRuntime(", "function customerRankYoyRuntimeFixed(", 1)
     # The embedded HTML cannot reliably fetch its sibling YoY page on Streamlit
     # Cloud.  Bootstrap the prior-year detail in the same document so the sales
     # dashboard can both show customer YoY and let users select 2025 months.
@@ -291,7 +297,7 @@ def inject_customer_yoy(html: str) -> str:
       render();
     })();
 """
-    runtime = f"{bootstrap}    customerRankYoyRuntime({payload});\n"
+    runtime = f"{helper}\n{bootstrap}    customerRankYoyRuntimeFixed({payload});\n"
     marker = "    fetch('2026-vs-2025-yoy-dashboard.html').then(response => {"
     start = html.find(marker)
     if start >= 0:
