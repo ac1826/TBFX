@@ -276,7 +276,22 @@ def inject_customer_yoy(html: str) -> str:
     baseline_path = STATIC_DIR / "customer-yoy-baseline.json"
     prior_rows = json.loads(baseline_path.read_text(encoding="utf-8"))
     payload = json.dumps(prior_rows, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
-    runtime = f"    customerRankYoyRuntime({payload});\n"
+    # The embedded HTML cannot reliably fetch its sibling YoY page on Streamlit
+    # Cloud.  Bootstrap the prior-year detail in the same document so the sales
+    # dashboard can both show customer YoY and let users select 2025 months.
+    bootstrap = """
+    (() => {
+      const priorDetail = Array.isArray(APP_DATA.customerPriorRecords) ? APP_DATA.customerPriorRecords : [];
+      const priorMonths = Array.from({ length: 9 }, (_, index) => `2025.${String(index + 1).padStart(2, '0')}`);
+      priorMonths.slice().reverse().forEach(month => { if (!MONTH_ORDER.includes(month)) MONTH_ORDER.unshift(month); });
+      if (priorDetail.length && !RAW.some(row => String(row.mo || '').startsWith('2025.'))) {
+        RAW.push(...priorDetail.map(row => ({ ...row, mo: String(row.mo || '').replace(/^2026\\./, '2025.') })));
+      }
+      setupFilters();
+      render();
+    })();
+"""
+    runtime = f"{bootstrap}    customerRankYoyRuntime({payload});\n"
     marker = "    fetch('2026-vs-2025-yoy-dashboard.html').then(response => {"
     start = html.find(marker)
     if start >= 0:

@@ -1295,7 +1295,12 @@ def main() -> None:
 
     sales_data["records"] = sales_records
     sales_data["netContributionAdjustments"] = adjustments
-    sales_data["monthOrder"] = [f"2026.{month:02d}" for month in range(1, 10)]
+    # The sales dashboard can inspect either year's monthly detail.  Keep the
+    # 2025 rows in the prior-year payload while exposing both years in the filter.
+    sales_data["monthOrder"] = [
+        *[f"2025.{month:02d}" for month in range(1, 10)],
+        *[f"2026.{month:02d}" for month in range(1, 10)],
+    ]
     sales_data["channelOrder"] = YOY_CHANNEL_ORDER
     region_order = list(sales_data.get("newRegionOrder") or [])
     if "GKA" not in region_order:
