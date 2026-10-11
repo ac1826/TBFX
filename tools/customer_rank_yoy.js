@@ -9,7 +9,12 @@ function customerRankYoyRuntime(priorRows) {
     const regions = getMultiValues('regionFilter');
     const item = document.getElementById('itemFilter').value;
     const kw = document.getElementById('searchInput').value.trim().toLowerCase();
-    const filteredPrior = priorRows.filter(r =>
+    // The deployed portal uses a compact, already-aggregated baseline.  Do
+    // not call Array#filter on that object (the old code aborted here, leaving
+    // the original tooltip visible).  Detailed baselines still honour all
+    // current filters as before.
+    const isAggregated = Boolean(priorRows && priorRows.aggregated);
+    const filteredPrior = isAggregated ? [] : priorRows.filter(r =>
       (!months.length || months.includes(r.mo)) &&
       (!cats.length || cats.includes(r.cat)) &&
       (item === '__ALL__' || r.item === item) &&
@@ -17,7 +22,7 @@ function customerRankYoyRuntime(priorRows) {
       (!regions.length || regions.includes(r.nr)) &&
       (!kw || `${r.pc} ${r.pn} ${r.mcn} ${r.mcid} ${r.o} ${r.nr}`.toLowerCase().includes(kw))
     );
-    const prior = priorRows && priorRows.aggregated
+    const prior = isAggregated
       ? new Map((priorRows.rows || []).map(r => [r.mcid, r]))
       : new Map(groupBy(currentScopeRows(filteredPrior), ['mcid']).map(r => [r.mcid, r]));
     const current = topBy(groupBy(currentScopeRows(rows), ['mcid']), activeMetric, 20).reverse();
@@ -42,7 +47,7 @@ function customerRankYoyRuntime(priorRows) {
         `净边贡：${display(r.net_margin_k,'net_margin_k')}　同比：${value('net_margin_k')}<br/>` +
         `净边贡率：${display(r.net_margin_rate,'net_margin_rate')}　同比：${value('net_margin_rate')}<br/>` +
         `SKU数：${(r.sku_cnt || 0).toLocaleString('zh-CN')}　同比：${value('sku_cnt')}`;
-    } } }, true);
+    } } });
   };
   renderCustomerRank(currentRows());
 }

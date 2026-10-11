@@ -730,9 +730,10 @@ def enrich_sales(record: dict[str, Any], context: dict[str, Any], year: int = 20
     org_customer = context["org_customers"].get(cid) or {}
     reference = context["reference_maps"].get(cid) or {}
     researched = RESEARCHED_GEO.get(cid) or {}
-    confirmed_geo = context.get("user_confirmed_geo_2026", {}).get(cid, {}) if year == 2026 else {}
-    if year != 2026 and cid in context.get("user_rka_2026", ()):
-        researched = {}
+    # The 2026 customer geography is the canonical comparison mapping.  Apply
+    # it to both years so a customer does not move between province/city solely
+    # because the source workbook is 2025 or 2026.
+    confirmed_geo = context.get("user_confirmed_geo_2026", {}).get(cid, {})
     code = office_code(office)
     canonical_region = context["canonical_region"].get(code, "")
     merged_id = context["merged_customers"].get(cid) or reference.get("mcid") or cid
@@ -763,7 +764,7 @@ def enrich_sales(record: dict[str, Any], context: dict[str, Any], year: int = 20
         or org_customer.get("channel")
         or reference.get("ch")
     )
-    if year == 2026 and cid in context.get("user_rka_2026", ()) and not code.startswith("3005"):
+    if cid in context.get("user_rka_2026", ()) and not code.startswith("3005"):
         primary_channel = "KA"
     name_match = {"status": "not_needed"}
     if not primary_city or not primary_province or not primary_channel:

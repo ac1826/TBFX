@@ -164,7 +164,7 @@ def test_name_consensus_fills_dimensions_without_merging_customer_identity() -> 
     assert enriched["name_match_status"] == "mapped"
 
 
-def test_rka_customer_override_is_year_scoped_and_keeps_identity() -> None:
+def test_rka_customer_override_is_shared_by_both_years_and_keeps_identity() -> None:
     context = {key: {} for key in (
         "canonical_geo", "customer_cities", "org_customers", "reference_maps",
         "canonical_region", "merged_customers", "canonical_channel", "customer_names",
@@ -177,9 +177,7 @@ def test_rka_customer_override_is_year_scoped_and_keeps_identity() -> None:
     previous = enrich_sales(row, context, 2025)
     assert (current["ch"], current["p"], current["ct"]) == ("KA", "江苏省", "苏州")
     assert current["mcid"] == "274778"
-    assert previous["ch"] == "未映射"
-    assert previous["p"] == "未识别省份"
-    assert previous["ct"] == "未映射"
+    assert (previous["ch"], previous["p"], previous["ct"]) == ("KA", "江苏省", "苏州")
     row["销售办事处"] = "3005 电商"
     assert enrich_sales(row, context, 2026)["ch"] == "电商"
 
@@ -198,7 +196,7 @@ def test_confirmed_geography_overrides_old_location_without_changing_channel_or_
     current = enrich_sales(row, context, 2026)
     previous = enrich_sales(row, context, 2025)
     assert (current["p"], current["ct"], current["ch"], current["mcid"]) == ("浙江省", "金华", "KA", "274749")
-    assert (previous["p"], previous["ct"]) == ("江苏省", "苏州")
+    assert (previous["p"], previous["ct"]) == ("浙江省", "金华")
 
 
 def test_generated_enjoydelai_name_consensus_mapping_keeps_customer_ids() -> None:

@@ -32,6 +32,12 @@ if(!result.includes('销额：300　同比：+50.0%'))throw Error(result);
 if(!result.includes('净边贡：90　同比：+125.0%'))throw Error(result);
 if(!result.includes('净边贡率：30.0%　同比：+10.0%'))throw Error(result);
 if(!result.includes('SKU数：1　同比：+0.0%'))throw Error(result);
+// The Streamlit portal ships a compact aggregated baseline.  It must use the
+// same tooltip path instead of throwing when Array#filter is unavailable.
+customerRankYoyRuntime({aggregated:true,rows:[{mcid:'C',mcn:'客户',volume_ton:20,income_k:200,net_margin_k:40,net_margin_rate:0.2,sku_cnt:1}]});
+const compactResult=formatter([{dataIndex:0}]);
+if(!compactResult.includes('销额：300　同比：+50.0%'))throw Error('Aggregated baseline tooltip missing');
+customerRankYoyRuntime(prior);
 filters.monthFilter=['2026.02'];renderCustomerRank(now);
 if(!formatter([{dataIndex:0}]).includes('2025为0，无法计算')) {
   // February has a nonzero sales baseline and must not use January values.
