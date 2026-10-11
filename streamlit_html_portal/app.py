@@ -333,7 +333,11 @@ def inject_customer_yoy(html: str) -> str:
       const priorMonths = Array.from({ length: 9 }, (_, index) => `2025.${String(index + 1).padStart(2, '0')}`);
       priorMonths.slice().reverse().forEach(month => { if (!MONTH_ORDER.includes(month)) MONTH_ORDER.unshift(month); });
       if (priorDetail.length && !RAW.some(row => String(row.mo || '').startsWith('2025.'))) {
-        RAW.push(...priorDetail.map(row => ({ ...row, mo: String(row.mo || '').replace(/^2026\\./, '2025.') })));
+        const mappedPrior = priorDetail.map(row => ({ ...row, mo: String(row.mo || '').replace(/^2026\\./, '2025.') }));
+        // Avoid exceeding the browser's argument-count limit on 140k rows.
+        for (let offset = 0; offset < mappedPrior.length; offset += 5000) {
+          RAW.push(...mappedPrior.slice(offset, offset + 5000));
+        }
       }
       setupFilters();
       render();
