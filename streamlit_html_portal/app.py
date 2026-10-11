@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+from functools import lru_cache
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -272,10 +273,51 @@ def extract_app_data(text: str) -> dict:
     raise ValueError("APP_DATA JSON end not found")
 
 
+@lru_cache(maxsize=1)
+def load_prior_sales_rows() -> list[dict]:
+    """Convert the 2025 detail in the comparison dashboard to sales-row shape."""
+    source = (STATIC_DIR / "2026-vs-2025-yoy-dashboard.html").read_text(
+        encoding="utf-8", errors="replace"
+    )
+    records = extract_app_data(source).get("records", [])
+    rows: list[dict] = []
+    for row in records:
+        if str(row.get("y", "")) != "2025":
+            continue
+        month = str(row.get("mo", ""))
+        if not month.endswith("月"):
+            continue
+        try:
+            month_no = int(month[:-1])
+        except ValueError:
+            continue
+        if not 1 <= month_no <= 12:
+            continue
+        rows.append({
+            "mo": f"2025.{month_no:02d}",
+            "mr": f"250{month_no}" if month_no < 10 else f"25{month_no}",
+            "o": row.get("o", ""), "nr": row.get("nr", ""),
+            "ch": row.get("ch", ""), "cid": row.get("mcid", ""),
+            "cn": row.get("mcn", ""), "mcid": row.get("mcid", ""),
+            "mcn": row.get("mcn", ""), "p": row.get("p", ""),
+            "ct": row.get("ct", ""), "pc": row.get("pc", ""),
+            "pn": row.get("pn", ""), "cat": row.get("cat", ""),
+            "item": row.get("item", ""), "v": row.get("v", 0),
+            "inc": row.get("inc", 0), "dt": row.get("dt", 0),
+            "am": row.get("am", 0), "fr": row.get("fr", 0),
+            "ad": row.get("ad", 0), "nm": row.get("nm", 0),
+            "ni": row.get("ni", 0),
+        })
+    return rows
+
+
 def inject_customer_yoy(html: str) -> str:
     baseline_path = STATIC_DIR / "customer-yoy-baseline.json"
     prior_rows = json.loads(baseline_path.read_text(encoding="utf-8"))
     payload = json.dumps(prior_rows, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+    prior_detail_payload = json.dumps(
+        load_prior_sales_rows(), ensure_ascii=False, separators=(",", ":")
+    ).replace("</", "<\\/")
     # Keep the portal independent from the copy of this helper embedded in the
     # large static HTML.  That copy is historical and can be stale after a
     # data refresh; the checked-in helper contains the aggregated-baseline fix.
@@ -287,7 +329,7 @@ def inject_customer_yoy(html: str) -> str:
     # dashboard can both show customer YoY and let users select 2025 months.
     bootstrap = """
     (() => {
-      const priorDetail = Array.isArray(APP_DATA.customerPriorRecords) ? APP_DATA.customerPriorRecords : [];
+      const priorDetail = __PRIOR_DETAIL__;
       const priorMonths = Array.from({ length: 9 }, (_, index) => `2025.${String(index + 1).padStart(2, '0')}`);
       priorMonths.slice().reverse().forEach(month => { if (!MONTH_ORDER.includes(month)) MONTH_ORDER.unshift(month); });
       if (priorDetail.length && !RAW.some(row => String(row.mo || '').startsWith('2025.'))) {
@@ -297,6 +339,7 @@ def inject_customer_yoy(html: str) -> str:
       render();
     })();
 """
+    bootstrap = bootstrap.replace("__PRIOR_DETAIL__", prior_detail_payload)
     runtime = f"{helper}\n{bootstrap}    customerRankYoyRuntimeFixed({payload});\n"
     marker = "    fetch('2026-vs-2025-yoy-dashboard.html').then(response => {"
     start = html.find(marker)
