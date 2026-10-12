@@ -341,10 +341,11 @@ def inject_customer_yoy(html: str) -> str:
       }
       setupFilters();
       render();
+      customerRankYoyRuntimeFixed(priorDetail);
     })();
 """
     bootstrap = bootstrap.replace("__PRIOR_DETAIL__", prior_detail_payload)
-    runtime = f"{helper}\n{bootstrap}    customerRankYoyRuntimeFixed({payload});\n"
+    runtime = f"{helper}\n{bootstrap}\n"
     marker = "    fetch('2026-vs-2025-yoy-dashboard.html').then(response => {"
     start = html.find(marker)
     if start >= 0:

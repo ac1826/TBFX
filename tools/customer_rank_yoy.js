@@ -3,7 +3,12 @@ function customerRankYoyRuntime(priorRows) {
   const originalRenderCustomerRank = renderCustomerRank;
   renderCustomerRank = function(rows) {
     originalRenderCustomerRank(rows);
-    const months = getMultiValues('monthFilter').map(m => `${parseInt(String(m).split('.').pop(), 10)}月`);
+    const selectedMonths = getMultiValues('monthFilter');
+    const monthNumber = m => parseInt(String(m).replace(/月$/, '').split('.').pop(), 10);
+    const months = selectedMonths.map(monthNumber);
+    // No 2024 history exists. Never compare 2025 (or mixed-year selections)
+    // against the 2025 baseline and call that year-over-year growth.
+    const comparable = !selectedMonths.length || selectedMonths.every(m => String(m).startsWith('2026.'));
     const cats = getMultiValues('categoryFilter');
     const channels = getMultiValues('channelFilter');
     const regions = getMultiValues('regionFilter');
@@ -15,7 +20,7 @@ function customerRankYoyRuntime(priorRows) {
     // current filters as before.
     const isAggregated = Boolean(priorRows && priorRows.aggregated);
     const filteredPrior = isAggregated ? [] : priorRows.filter(r =>
-      (!months.length || months.includes(r.mo)) &&
+      (!months.length || months.includes(monthNumber(r.mo))) &&
       (!cats.length || cats.includes(r.cat)) &&
       (item === '__ALL__' || r.item === item) &&
       (!channels.length || channels.includes(r.ch)) &&
@@ -40,7 +45,8 @@ function customerRankYoyRuntime(priorRows) {
     charts.customerRank.setOption({ tooltip:{ formatter:params => {
       const r = current[params[0].dataIndex] || {};
       const old = prior.get(r.mcid);
-      const value = key => old ? change(r[key], old[key], key === 'net_margin_rate') : '2025无数据';
+      const value = key => !comparable || (isAggregated && selectedMonths.length) ? '—' :
+        old ? change(r[key], old[key], key === 'net_margin_rate') : '2025无数据';
       return `${r.customerName || r.mcn || r.mcid || params[0].name}<br/>` +
         `销量：${display(r.volume_ton,'volume_ton')}　同比：${value('volume_ton')}<br/>` +
         `销额：${display(r.income_k,'income_k')}　同比：${value('income_k')}<br/>` +

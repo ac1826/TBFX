@@ -36,7 +36,7 @@ if(!result.includes('SKU数：1　同比：+0.0%'))throw Error(result);
 // same tooltip path instead of throwing when Array#filter is unavailable.
 customerRankYoyRuntime({aggregated:true,rows:[{mcid:'C',mcn:'客户',volume_ton:20,income_k:200,net_margin_k:40,net_margin_rate:0.2,sku_cnt:1}]});
 const compactResult=formatter([{dataIndex:0}]);
-if(!compactResult.includes('销额：300　同比：+50.0%'))throw Error('Aggregated baseline tooltip missing');
+if(!compactResult.includes('销额：300　同比：—'))throw Error('Aggregate must not substitute for monthly baseline');
 customerRankYoyRuntime(prior);
 filters.monthFilter=['2026.02'];renderCustomerRank(now);
 if(!formatter([{dataIndex:0}]).includes('2025为0，无法计算')) {
@@ -45,6 +45,13 @@ if(!formatter([{dataIndex:0}]).includes('2025为0，无法计算')) {
 }
 filters.monthFilter=['2026.03'];renderCustomerRank(now);
 if((formatter([{dataIndex:0}]).match(/2025无数据/g)||[]).length!==5)throw Error('Missing prior-year state');
+filters.monthFilter=['2025.01'];renderCustomerRank([{...now[0],mo:'2025.01'}]);
+if((formatter([{dataIndex:0}]).match(/同比：—/g)||[]).length!==5)throw Error('2025 must not compare against itself');
+filters.monthFilter=['2026.01'];
+customerRankYoyRuntime(prior.map(r=>({...r,mo:`2025.${String(parseInt(r.mo)).padStart(2,'0')}`})));
+if(!formatter([{dataIndex:0}]).includes('销额：300　同比：+50.0%'))throw Error('Portal month labels ignored');
+filters.monthFilter=['2026.01','2026.02'];renderCustomerRank(now);
+if(!formatter([{dataIndex:0}]).includes('同比：-96.7%'))throw Error('Multi-month prior selection ignored');
 const priorHtml='const APP_DATA = '+JSON.stringify({records:[{...base,y:'2025'},{...base,y:'2026'}]})+';\n';
 if(customerRankYoyData(priorHtml).length!==1)throw Error('Wrong year');
 const patched=withCustomerRankYoy('<body></body>',[{...base,mcn:'</script>'}]);
