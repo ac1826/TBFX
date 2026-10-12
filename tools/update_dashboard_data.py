@@ -30,6 +30,7 @@ CHANNEL_CLASSIFICATION_NAME = "渠道分类.xlsx"
 ORG_MASTER_NAME = "销售办事处组织架构及渠道.xlsx"
 CUSTOMER_LIST_NAME = "客户清单_10月.xlsx"
 CUSTOMER_MAPPING_SUPPLEMENT_NAME = "清单1.xlsx"
+KA_CUSTOMER_MERGE_SUPPLEMENT = REPO_ROOT / "streamlit_html_portal/static/ka-customer-merge.json"
 REFERENCE_HTML_NAME = "2026年1-6月主次渠道分析仪表盘.html"
 SALES_SOURCE_HTML = F_DIR / "2026年1-9月数据分析仪表盘.html"
 YOY_SOURCE_HTML = F_DIR / "26年与25年_1-9月数据对比分析.html"
@@ -536,6 +537,15 @@ def build_lookup_context(region_master: Path) -> dict[str, Any]:
         for row in merge_sheet.to_dict("records")
         if clean_code(row.get("客户编码")) and clean_code(row.get("合并-促销"))
     }
+    if KA_CUSTOMER_MERGE_SUPPLEMENT.exists():
+        ka_merges = json.loads(KA_CUSTOMER_MERGE_SUPPLEMENT.read_text(encoding="utf-8"))
+        for customer, merge in ka_merges.items():
+            customer = clean_code(customer)
+            merged_id = clean_code(merge.get("mcid"))
+            merged_name = clean_str(merge.get("mcn"))
+            if customer and merged_id and merged_name:
+                merged_customers[customer] = merged_id
+                customer_names.setdefault(merged_id, merged_name)
     # Search the whole customer master by exact customer ID. For customers with an
     # explicit promotion merge, the merged customer's city is an allowed fallback.
     for customer, city in customer_cities.items():
