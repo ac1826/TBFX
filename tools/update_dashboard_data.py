@@ -228,6 +228,18 @@ def clean_code(value: Any) -> str:
     return text
 
 
+def supplement_customer_merges(
+    existing: dict[str, str], customer_master: dict[str, dict[str, Any]]
+) -> dict[str, str]:
+    merged = dict(existing)
+    for customer, details in customer_master.items():
+        customer = clean_code(customer)
+        merge_id = clean_code(details.get("mcid"))
+        if customer and merge_id:
+            merged.setdefault(customer, merge_id)
+    return merged
+
+
 def num(value: Any) -> float:
     if value is None or pd.isna(value):
         return 0.0
@@ -657,6 +669,7 @@ def build_lookup_context(region_master: Path) -> dict[str, Any]:
             sales_regions[customer] = sales_region
     if SEPTEMBER_CUSTOMER_MASTER.exists():
         september_customers = json.loads(SEPTEMBER_CUSTOMER_MASTER.read_text(encoding="utf-8"))
+        merged_customers = supplement_customer_merges(merged_customers, september_customers)
         for customer, details in september_customers.items():
             customer = clean_code(customer)
             if not customer:
@@ -682,11 +695,8 @@ def build_lookup_context(region_master: Path) -> dict[str, Any]:
                 canonical_channel[customer] = channel
             if office:
                 listed_offices[customer] = office
-            # The September register is the latest complete identity snapshot.
-            # A missing merge there means the customer is no longer merged.
-            merged_customers[customer] = merge_id or customer
             if merge_id and merge_name:
-                customer_names[merge_id] = merge_name
+                customer_names.setdefault(merge_id, merge_name)
     return {
         "canonical_channel": canonical_channel,
         "user_rka_2026": USER_CONFIRMED_RKA_2026,

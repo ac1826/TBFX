@@ -13,6 +13,7 @@ import pytest
 from tools.update_dashboard_data import (
     YOY_CHANNEL_ORDER,
     YOY_MONTH_ORDER,
+    KA_CUSTOMER_MERGE_SUPPLEMENT,
     city_from_sales_region,
     enrich_sales,
     first_present,
@@ -22,6 +23,7 @@ from tools.update_dashboard_data import (
     read_dashboard_html,
     month_cn,
     sales_rows_from_yoy,
+    supplement_customer_merges,
     split_office_adjustments_2026,
     totals_with_adjustments,
 )
@@ -52,6 +54,15 @@ def test_sales_dashboard_contains_comparable_2025_monthly_detail() -> None:
         row for row in sales["netContributionAdjustments"] if row["mr"].startswith("2025.")
     ]
     assert len(prior_adjustments) == 8
+
+
+def test_september_merges_supplement_previous_customer_merges() -> None:
+    result = supplement_customer_merges(
+        {"100": "OLD-GROUP", "200": "OLD-200"},
+        {"100": {"mcid": "NEW-GROUP"}, "300": {"mcid": "NEW-300"}, "400": {"name": "No merge"}},
+    )
+
+    assert result == {"100": "OLD-GROUP", "200": "OLD-200", "300": "NEW-300"}
 
 
 def test_structure_treemaps_display_share_and_yoy_for_every_node() -> None:
@@ -233,6 +244,7 @@ def test_generated_enjoydelai_name_consensus_mapping_keeps_customer_ids() -> Non
     assert {row["cid"] for row in mapped_rows} == expected
     assert all((row["ch"], row["p"], row["ct"]) == ("KA", "江苏省", "苏州") for row in mapped_rows)
     assert all(row["mcid"] == row["cid"] for row in mapped_rows)
+    previous_merges = json.loads(KA_CUSTOMER_MERGE_SUPPLEMENT.read_text(encoding="utf-8"))
     for customer, province, city in [
         ("274788", "浙江省", "宁波"), ("274790", "江苏省", "南京"),
         ("274723", "上海市", "上海"), ("274745", "辽宁省", "沈阳"),
@@ -240,7 +252,12 @@ def test_generated_enjoydelai_name_consensus_mapping_keeps_customer_ids() -> Non
     ]:
         selected = [row for row in records if row.get("cid") == customer]
         assert selected
-        assert all((row["ch"], row["p"], row["ct"], row["mcid"]) == ("KA", province, city, customer) for row in selected)
+        expected_merge = previous_merges.get(customer, {}).get("mcid", customer)
+        assert all(
+            (row["ch"], row["p"], row["ct"], row["mcid"])
+            == ("KA", province, city, expected_merge)
+            for row in selected
+        )
 
 
 def test_dashboard_display_precision_contract() -> None:
