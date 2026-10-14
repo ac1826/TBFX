@@ -32,6 +32,7 @@ ORG_MASTER_NAME = "销售办事处组织架构及渠道.xlsx"
 CUSTOMER_LIST_NAME = "客户清单_10月.xlsx"
 CUSTOMER_MAPPING_SUPPLEMENT_NAME = "清单1.xlsx"
 KA_CUSTOMER_MERGE_SUPPLEMENT = REPO_ROOT / "streamlit_html_portal/static/ka-customer-merge.json"
+SEPTEMBER_CUSTOMER_MASTER = REPO_ROOT / "streamlit_html_portal/static/customer-master-september.json"
 REFERENCE_HTML_NAME = "2026年1-6月主次渠道分析仪表盘.html"
 SALES_SOURCE_HTML = F_DIR / "2026年1-9月数据分析仪表盘.html"
 YOY_SOURCE_HTML = F_DIR / "26年与25年_1-9月数据对比分析.html"
@@ -161,6 +162,49 @@ def replace_app_data(path: Path, data: dict[str, Any]) -> None:
     start, end, _ = extract_app_data(text)
     payload = json.dumps(data, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
     path.write_bytes(gzip.compress((text[:start] + payload + text[end:]).encode("utf-8"), mtime=0))
+
+
+def sales_rows_from_yoy(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows = []
+    for row in records:
+        if row.get("y") != "2025":
+            continue
+        month_no = int(str(row.get("mo", "")).removesuffix("月"))
+        rows.append({
+            "mo": f"2025.{month_no:02d}",
+            "mr": f"250{month_no}" if month_no < 10 else f"25{month_no}",
+            "o": row.get("o", ""), "nr": row.get("nr", ""), "ch": row.get("ch", ""),
+            "cid": row.get("mcid", ""), "cn": row.get("mcn", ""),
+            "mcid": row.get("mcid", ""), "mcn": row.get("mcn", ""),
+            "p": row.get("p", ""), "ct": row.get("ct", ""),
+            "pc": row.get("pc", ""), "pn": row.get("pn", ""),
+            "cat": row.get("cat", ""), "item": row.get("item", ""),
+            "v": row.get("v", 0), "inc": row.get("inc", 0), "dt": row.get("dt", 0),
+            "am": row.get("am", 0), "fr": row.get("fr", 0),
+            "ad": row.get("ad", 0), "nm": row.get("nm", 0), "ni": row.get("ni", 0),
+        })
+    return rows
+
+
+def inject_standalone_customer_yoy(html: str) -> str:
+    helper_path = REPO_ROOT / "tools" / "customer_rank_yoy.js"
+    helper = helper_path.read_text(encoding="utf-8").split("\nif (typeof module !== 'undefined')", 1)[0]
+    helper = helper.replace("function customerRankYoyRuntime(", "function customerRankYoyRuntimeFixed(", 1)
+    marker = "    fetch('2026-vs-2025-yoy-dashboard.html').then(response => {"
+    start = html.find(marker)
+    if start >= 0:
+        end = html.find("    window.addEventListener('resize'", start)
+        if end >= 0:
+            html = html[:start] + html[end:]
+    script = (
+        "<script>\n" + helper + "\n"
+        "customerRankYoyRuntimeFixed(RAW.filter(row => String(row.mo || '').startsWith('2025.')));\n"
+        "</script>\n"
+    )
+    closing_body = html.rfind("</body>")
+    if closing_body < 0:
+        raise ValueError("Sales dashboard has no closing body tag")
+    return html[:closing_body] + script + html[closing_body:]
 
 
 def load_app_data(path: Path) -> dict[str, Any]:
@@ -611,6 +655,38 @@ def build_lookup_context(region_master: Path) -> dict[str, Any]:
             geo["p"] = province
         if sales_region:
             sales_regions[customer] = sales_region
+    if SEPTEMBER_CUSTOMER_MASTER.exists():
+        september_customers = json.loads(SEPTEMBER_CUSTOMER_MASTER.read_text(encoding="utf-8"))
+        for customer, details in september_customers.items():
+            customer = clean_code(customer)
+            if not customer:
+                continue
+            name = clean_str(details.get("name"))
+            city = clean_str(details.get("city"))
+            channel = clean_str(details.get("channel"))
+            office = clean_code(details.get("office"))
+            merge_id = clean_code(details.get("mcid"))
+            merge_name = clean_str(details.get("mcn"))
+            if name:
+                customer_names[customer] = name
+                listed_names[customer] = name
+            if city:
+                customer_cities[customer] = city
+                geo = canonical_geo.setdefault(customer, {})
+                if not geo.get("ct"):
+                    geo["ct"] = city
+                province = province_from_city(city, org_sales_region_provinces)
+                if province and not geo.get("p"):
+                    geo["p"] = province
+            if channel and customer not in canonical_channel:
+                canonical_channel[customer] = channel
+            if office:
+                listed_offices[customer] = office
+            # The September register is the latest complete identity snapshot.
+            # A missing merge there means the customer is no longer merged.
+            merged_customers[customer] = merge_id or customer
+            if merge_id and merge_name:
+                customer_names[merge_id] = merge_name
     return {
         "canonical_channel": canonical_channel,
         "user_rka_2026": USER_CONFIRMED_RKA_2026,
@@ -756,6 +832,7 @@ def enrich_sales(record: dict[str, Any], context: dict[str, Any], year: int = 20
     merged_org_customer = context["org_customers"].get(merged_id) or {}
     primary_city = (
         confirmed_geo.get("city")
+        or researched.get("ct")
         or geo.get("ct")
         or context["customer_cities"].get(cid)
         or org_customer.get("city")
@@ -768,7 +845,7 @@ def enrich_sales(record: dict[str, Any], context: dict[str, Any], year: int = 20
     primary_province = (
         "山东省"
         if code == "7420"
-        else confirmed_geo.get("province") or geo.get("p") or merged_geo.get("p") or reference.get("p") or researched.get("p")
+        else confirmed_geo.get("province") or researched.get("p") or geo.get("p") or merged_geo.get("p") or reference.get("p")
     )
     primary_channel = (
         "电商"
@@ -1331,10 +1408,21 @@ def main() -> None:
     update_quality_yoy(yoy_data, yoy_records, yoy_adjustments, source_2025, source_2026, stats_2025, stats_2026)
     yoy_data["quality"]["name_consensus_mapping"] = name_mapping_quality
 
+    prior_sales_records = sales_rows_from_yoy(yoy_records)
+    sales_data["records"] = prior_sales_records + sales_records
+    prior_adjustments = [
+        {**row, "mr": f"2025.{int(str(row['mo']).removesuffix('月')):02d}"}
+        for row in adjustments_2025
+    ]
+    sales_data["netContributionAdjustments"] = prior_adjustments + adjustments
+    sales_data["quality"]["prior_year_rows"] = len(prior_sales_records)
+    sales_data["quality"]["prior_year_source"] = str(source_2025)
+
     for path, data in ((SALES_STATIC, sales_data), (YOY_STATIC, yoy_data)):
         replace_app_data(path, data)
 
-    SALES_SOURCE_HTML.write_bytes(gzip.decompress(SALES_STATIC.read_bytes()))
+    sales_html = gzip.decompress(SALES_STATIC.read_bytes()).decode("utf-8")
+    SALES_SOURCE_HTML.write_text(inject_standalone_customer_yoy(sales_html), encoding="utf-8")
     YOY_SOURCE_HTML.write_bytes(gzip.decompress(YOY_STATIC.read_bytes()))
 
     print(json.dumps({

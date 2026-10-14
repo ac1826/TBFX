@@ -21,6 +21,7 @@ from tools.update_dashboard_data import (
     SALES_STATIC,
     read_dashboard_html,
     month_cn,
+    sales_rows_from_yoy,
     split_office_adjustments_2026,
     totals_with_adjustments,
 )
@@ -34,6 +35,23 @@ def test_yoy_requested_panel_notes_are_removed() -> None:
     for title in ("C. 渠道结构同比树图", "D. 品类结构同比树图", "E. 客户贡献变化",
                   "F. 月度同比走势", "G. 品类贡献变化", "H. 物料贡献变化"):
         assert f'<div class="panel-head"><h2>{title}</h2></div>' in text
+
+
+def test_sales_dashboard_contains_comparable_2025_monthly_detail() -> None:
+    sales = load_app_data(SALES_STATIC)
+    yoy = load_app_data(YOY_STATIC)
+    prior = [row for row in sales["records"] if row["mo"].startswith("2025.")]
+    expected_prior = sales_rows_from_yoy(yoy["records"])
+
+    assert len(prior) == len(expected_prior) > 0
+    assert {row["mo"] for row in prior} == {f"2025.{month:02d}" for month in range(1, 10)}
+    assert sum(row["inc"] for row in prior) == pytest.approx(
+        yoy["quality"]["detail_totals"]["2025"]["income_k"], abs=0.01
+    )
+    prior_adjustments = [
+        row for row in sales["netContributionAdjustments"] if row["mr"].startswith("2025.")
+    ]
+    assert len(prior_adjustments) == 8
 
 
 def test_structure_treemaps_display_share_and_yoy_for_every_node() -> None:
