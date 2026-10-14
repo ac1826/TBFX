@@ -5,6 +5,23 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_streamlit_yoy_injection_reuses_existing_raw_rows() -> None:
+    from streamlit_html_portal.customer_yoy import inject_customer_yoy
+
+    source = (
+        "<script>const RAW=[];\n"
+        "    fetch('2026-vs-2025-yoy-dashboard.html').then(response => {\n"
+        "    window.addEventListener('resize', () => {});\n"
+        "</script></body>"
+    )
+    result = inject_customer_yoy(source)
+
+    assert "customerRankYoyRuntimeFixed(RAW.filter" in result
+    assert "fetch('2026-vs-2025-yoy-dashboard.html')" not in result
+    assert "__PRIOR_DETAIL__" not in result
+    assert len(result.encode("utf-8")) < 12_000
+
+
 def test_customer_tooltip_yoy_respects_filters_and_distinct_skus():
     import gzip
     html = gzip.decompress((ROOT / 'streamlit_html_portal/static/2026-sales-dashboard.html.gz').read_bytes()).decode('utf-8')
