@@ -4,7 +4,7 @@ import gzip
 
 import streamlit as st
 import streamlit.components.v1 as components
-from streamlit_html_portal.customer_yoy import inject_customer_yoy
+from streamlit_html_portal.compressed_viewer import compressed_dashboard_html
 
 
 APP_TITLE = "PFS销售数据分析看板"
@@ -291,9 +291,7 @@ def render_dashboard(dashboard_key: str) -> None:
     )
     if st.button("返回选择看板"):
         go_home()
-    html = read_dashboard_html(path)
-    if dashboard_key == "sales":
-        html = inject_customer_yoy(html)
+    html = compressed_dashboard_html(path.read_bytes(), sales=dashboard_key == "sales")
     components.html(html, height=1200, scrolling=True)
 
 

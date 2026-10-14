@@ -1,6 +1,6 @@
 # PFS Streamlit 看板
 
-本仓库只部署 Streamlit 应用。首页提供销售看板和同比看板入口，HTML 在浏览器端展示。
+本仓库只部署 Streamlit 应用。首页提供销售看板和同比看板入口。服务器直接传输 gzip 压缩内容，浏览器无损解压后展示 HTML，避免把约 153 MiB 的展开 HTML 塞入 Streamlit 组件消息。
 
 ## 本地运行
 
