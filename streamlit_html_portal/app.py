@@ -1,6 +1,11 @@
 from pathlib import Path
 import json
 import gzip
+import sys
+
+# Cloud launches this file with its directory, rather than the repository root,
+# on sys.path. Make sibling application modules importable in both modes.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import streamlit as st
 import streamlit.components.v1 as components
