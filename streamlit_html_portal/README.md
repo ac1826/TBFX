@@ -1,27 +1,27 @@
-# PFS Streamlit HTML Portal
+# PFS Streamlit 看板
 
-这个 Streamlit 项目会把两份离线 HTML 看板整合到一个入口页里，不经过 GitHub Pages 中转。
-首页用于选择看板，点击后由 Streamlit 组件直接渲染对应 HTML。
+本仓库只部署 Streamlit 应用。首页提供销售看板和同比看板入口，HTML 在浏览器端展示。
 
 ## 本地运行
 
+在仓库根目录运行：
+
 ```powershell
-cd C:\Users\Lenovo\Documents\Codex\2026-05-20\files-mentioned-by-the-user-customer\streamlit_html_portal
-py -3 -m streamlit run app.py
+py -3 -m pip install -r streamlit_html_portal/requirements.txt
+py -3 -m streamlit run streamlit_html_portal/app.py
 ```
 
-## 部署到 Streamlit Cloud
+## Streamlit Community Cloud
 
-1. 将整个 `streamlit_html_portal` 文件夹上传到一个 GitHub 仓库。
-2. 在 Streamlit Cloud 选择该仓库。
-3. Main file path 填：`streamlit_html_portal/app.py`。
-4. 部署完成后，打开生成的 `*.streamlit.app` 地址。
+选择此 GitHub 仓库，主文件路径填写 `streamlit_html_portal/app.py`。应用配置位于仓库根目录的 `.streamlit/config.toml`，其中启用了 WebSocket 压缩。
 
-## 文件说明
+## 文件
 
-大区同比采用统一2026年RKA范围：两年均纳入7350、7559及明确塔斯汀品牌账户，2025年7550的其他客户仍归华东区。3005排除、7420、渠道、客户合并及金额口径保持不变。共享规则来自PFS数据管道，刷新脚本会同时更新两个HTML。
+- `streamlit_html_portal/app.py`：Streamlit 入口和看板选择页。
+- `streamlit_html_portal/static/*.html.gz`：两份原始 HTML 看板的 gzip 无损副本；运行时解压后原样展示。
+- `streamlit_html_portal/static/ka-customer-merge.json` 和 `customer-master-september.json`：客户合并和客户主数据，供看板数据刷新脚本使用。
+- `tools/update_dashboard_data.py`：更新看板数据并重新生成 gzip 文件。
+- `tools/customer_rank_yoy.js`：客户排名同比提示逻辑。
+- `tests/`：数据更新和同比逻辑测试。
 
-- `app.py`：Streamlit 入口页面，提供两个看板入口，并在 Streamlit 内渲染 HTML。
-- `static/2026-sales-dashboard.html.gz`：gzip 无损压缩的2026年销售数据看板。
-- `static/2026-vs-2025-yoy-dashboard.html.gz`：gzip 无损压缩的2026 vs 2025 同比分析。
-- `.streamlit/config.toml`：启用 WebSocket 压缩，减少看板传输量。
+大区同比规则及数据口径由 `tools/update_dashboard_data.py` 维护。HTML gzip 只改变存储和传输形式，不改变解压后的看板内容。
