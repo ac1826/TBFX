@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 import math
 import re
@@ -16,8 +17,8 @@ import pandas as pd
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 STATIC_DIR = REPO_ROOT / "streamlit_html_portal" / "static"
-SALES_STATIC = STATIC_DIR / "2026-sales-dashboard.html"
-YOY_STATIC = STATIC_DIR / "2026-vs-2025-yoy-dashboard.html"
+SALES_STATIC = STATIC_DIR / "2026-sales-dashboard.html.gz"
+YOY_STATIC = STATIC_DIR / "2026-vs-2025-yoy-dashboard.html.gz"
 
 F_DIR = Path("F:/llqdocument/大成文件/客户贡献分析")
 SOURCE_2026_NAME = "PFS 26年毛利表1-9月含电商 TOP20新版.xlsx"
@@ -41,6 +42,10 @@ UNMAPPED = "未映射"
 UNMAPPED_OUTPUT = F_DIR / "未映射明细.xlsx"
 OFFICE_ADJUSTMENT_EXPECTED_ROWS = 172
 OFFICE_ADJUSTMENT_EXPECTED_NET_MARGIN_K = 922.40665
+
+
+def read_dashboard_html(path: Path) -> str:
+    return gzip.decompress(path.read_bytes()).decode("utf-8", errors="replace")
 
 # Explicit location supplements confirmed from public records or by the user.
 # These are keyed by customer ID; office names are never used to infer geography.
@@ -147,7 +152,7 @@ def extract_app_data(text: str) -> tuple[int, int, dict[str, Any]]:
 
 
 def replace_app_data(path: Path, data: dict[str, Any]) -> None:
-    text = path.read_text(encoding="utf-8", errors="replace")
+    text = gzip.decompress(path.read_bytes()).decode("utf-8", errors="replace")
     if path == YOY_STATIC:
         text = text.replace(
             "。2025年明细截至8月，同比仅比较双方都有数据的1—8月。", "",
@@ -155,11 +160,11 @@ def replace_app_data(path: Path, data: dict[str, Any]) -> None:
         text = text.replace("2026年1-8月累计同比2025年分析", "2026年1-9月累计同比2025年分析")
     start, end, _ = extract_app_data(text)
     payload = json.dumps(data, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
-    path.write_text(text[:start] + payload + text[end:], encoding="utf-8")
+    path.write_bytes(gzip.compress((text[:start] + payload + text[end:]).encode("utf-8"), mtime=0))
 
 
 def load_app_data(path: Path) -> dict[str, Any]:
-    text = path.read_text(encoding="utf-8", errors="replace")
+    text = gzip.decompress(path.read_bytes()).decode("utf-8", errors="replace")
     _, _, data = extract_app_data(text)
     return data
 
@@ -1329,8 +1334,8 @@ def main() -> None:
     for path, data in ((SALES_STATIC, sales_data), (YOY_STATIC, yoy_data)):
         replace_app_data(path, data)
 
-    shutil.copy2(SALES_STATIC, SALES_SOURCE_HTML)
-    shutil.copy2(YOY_STATIC, YOY_SOURCE_HTML)
+    SALES_SOURCE_HTML.write_bytes(gzip.decompress(SALES_STATIC.read_bytes()))
+    YOY_SOURCE_HTML.write_bytes(gzip.decompress(YOY_STATIC.read_bytes()))
 
     print(json.dumps({
         "source_2026": str(source_2026),

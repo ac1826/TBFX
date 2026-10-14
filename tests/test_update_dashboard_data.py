@@ -17,6 +17,9 @@ from tools.update_dashboard_data import (
     enrich_sales,
     first_present,
     load_app_data,
+    YOY_STATIC,
+    SALES_STATIC,
+    read_dashboard_html,
     month_cn,
     split_office_adjustments_2026,
     totals_with_adjustments,
@@ -27,7 +30,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_yoy_requested_panel_notes_are_removed() -> None:
-    text = (ROOT / "streamlit_html_portal/static/2026-vs-2025-yoy-dashboard.html").read_text(encoding="utf-8")
+    text = read_dashboard_html(YOY_STATIC)
     for title in ("C. 渠道结构同比树图", "D. 品类结构同比树图", "E. 客户贡献变化",
                   "F. 月度同比走势", "G. 品类贡献变化", "H. 物料贡献变化"):
         assert f'<div class="panel-head"><h2>{title}</h2></div>' in text
@@ -37,7 +40,7 @@ def test_structure_treemaps_display_share_and_yoy_for_every_node() -> None:
     node = shutil.which("node")
     if not node:
         pytest.skip("Node is required to execute the dashboard label formatter")
-    text = (ROOT / "streamlit_html_portal/static/2026-vs-2025-yoy-dashboard.html").read_text(encoding="utf-8")
+    text = read_dashboard_html(YOY_STATIC)
     start = text.index("    function renderStructureTreemap(")
     end = text.index("    function renderChannelShareChart(", start)
     script = """
@@ -206,7 +209,7 @@ def test_generated_enjoydelai_name_consensus_mapping_keeps_customer_ids() -> Non
     }
     expected.update({"274772", "274773", "274774", "274776", "274777", "274778",
                      "274779", "274780", "274784", "274786", "274787"})
-    records = load_app_data(ROOT / "streamlit_html_portal/static/2026-sales-dashboard.html")["records"]
+    records = load_app_data(SALES_STATIC)["records"]
     mapped_rows = [row for row in records if row.get("cid") in expected]
 
     assert {row["cid"] for row in mapped_rows} == expected
@@ -223,8 +226,8 @@ def test_generated_enjoydelai_name_consensus_mapping_keeps_customer_ids() -> Non
 
 
 def test_dashboard_display_precision_contract() -> None:
-    sales_html = (ROOT / "streamlit_html_portal/static/2026-sales-dashboard.html").read_text(encoding="utf-8")
-    yoy_html = (ROOT / "streamlit_html_portal/static/2026-vs-2025-yoy-dashboard.html").read_text(encoding="utf-8")
+    sales_html = read_dashboard_html(SALES_STATIC)
+    yoy_html = read_dashboard_html(YOY_STATIC)
 
     for metric in ["net_margin_k", "income_k", "actual_margin_k", "volume_ton", "discount_total_k", "freight_k"]:
         assert f"{metric}:{{" in sales_html
@@ -276,7 +279,7 @@ def test_office_adjustments_are_split_from_rankable_detail() -> None:
 def test_yoy_adjustments_use_year_month_and_filter_scope() -> None:
     import re
     import subprocess
-    html = (ROOT / "streamlit_html_portal/static/2026-vs-2025-yoy-dashboard.html").read_text(encoding="utf-8")
+    html = read_dashboard_html(YOY_STATIC)
     names = ["adjustmentsAllowedInTotals", "adjustmentNetMargin", "summary", "totalSummary"]
     functions = "\n".join(re.search(r"    function " + name + r"\([^\n]*\) \{.*?\n    \}", html, re.S).group(0) for name in names)
     script = """

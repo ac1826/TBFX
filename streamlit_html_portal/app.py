@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+import gzip
 from functools import lru_cache
 
 import streamlit as st
@@ -13,13 +14,13 @@ DASHBOARDS = {
     "sales": {
         "title": "2026年销售数据看板",
         "description": "查看2026年1-9月客户、区域、渠道、品类和贡献表现。",
-        "filename": "2026-sales-dashboard.html",
+        "filename": "2026-sales-dashboard.html.gz",
         "button_class": "sales",
     },
     "yoy": {
         "title": "2026 vs 2025 同比分析",
         "description": "查看销量、销额、净边贡的同比增减，以及渠道、产品、区域变化。",
-        "filename": "2026-vs-2025-yoy-dashboard.html",
+        "filename": "2026-vs-2025-yoy-dashboard.html.gz",
         "button_class": "yoy",
     },
 }
@@ -213,6 +214,10 @@ def dashboard_file(dashboard_key: str) -> Path:
     return STATIC_DIR / DASHBOARDS[dashboard_key]["filename"]
 
 
+def read_dashboard_html(path: Path) -> str:
+    return gzip.decompress(path.read_bytes()).decode("utf-8", errors="replace")
+
+
 def go_home() -> None:
     st.query_params.clear()
 
@@ -276,9 +281,7 @@ def extract_app_data(text: str) -> dict:
 @lru_cache(maxsize=1)
 def load_prior_sales_rows() -> list[dict]:
     """Convert the 2025 detail in the comparison dashboard to sales-row shape."""
-    source = (STATIC_DIR / "2026-vs-2025-yoy-dashboard.html").read_text(
-        encoding="utf-8", errors="replace"
-    )
+    source = read_dashboard_html(STATIC_DIR / "2026-vs-2025-yoy-dashboard.html.gz")
     records = extract_app_data(source).get("records", [])
     rows: list[dict] = []
     for row in records:
@@ -374,7 +377,7 @@ def render_dashboard(dashboard_key: str) -> None:
     )
     if st.button("返回选择看板"):
         go_home()
-    html = path.read_text(encoding="utf-8", errors="replace")
+    html = read_dashboard_html(path)
     if dashboard_key == "sales":
         html = inject_customer_yoy(html)
     components.html(html, height=1200, scrolling=True)

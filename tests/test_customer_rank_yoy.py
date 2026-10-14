@@ -6,7 +6,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_customer_tooltip_yoy_respects_filters_and_distinct_skus():
-    html = (ROOT / 'streamlit_html_portal/static/2026-sales-dashboard.html').read_text(encoding='utf-8')
+    import gzip
+    html = gzip.decompress((ROOT / 'streamlit_html_portal/static/2026-sales-dashboard.html.gz').read_bytes()).decode('utf-8')
     aggregation = html[html.index('    function sumRows('):html.index('    function topBy(')]
     rate = html[html.index('    function netMarginRate('):html.index('    function metricValue(')]
     script = r'''
