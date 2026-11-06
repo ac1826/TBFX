@@ -26,7 +26,7 @@ SOURCE_2025_NAME = "PFS 25年毛利表1-10月 含电商 TOP20 -品项实际 新�
 # Compare only periods supported by both annual workbooks.
 YOY_MONTH_ORDER = [f"{month}月" for month in range(1, 11)]
 YOY_CHANNEL_ORDER = ["烘焙", "休闲", "团膳", "宴席", "零售", "KA", "鲜食工厂", "其他"]
-CUSTOMER_MASTER_NAME = "7月客户渠道及合并汇总.xlsx"
+CUSTOMER_MASTER_NAME = "10月客户明细及合并.xlsx"
 CHANNEL_CLASSIFICATION_NAME = "渠道分类.xlsx"
 ORG_MASTER_NAME = "销售办事处组织架构及渠道.xlsx"
 CUSTOMER_LIST_NAME = "客户清单_11.xlsx"
@@ -258,6 +258,20 @@ def supplement_customer_merges(
         merge_id = clean_code(details.get("mcid"))
         if customer and merge_id:
             merged.setdefault(customer, merge_id)
+    return merged
+
+
+def promotion_customer_merges(records: list[dict[str, Any]]) -> dict[str, str]:
+    """Accept explicit promotion mappings, including intentional self mappings."""
+    merged: dict[str, str] = {}
+    for row in records:
+        customer = clean_code(row.get("客户编码"))
+        target = clean_code(row.get("合并-促销"))
+        if not customer or not target:
+            continue
+        if customer in merged and merged[customer] != target:
+            raise ValueError(f"Conflicting promotion merges for customer {customer}")
+        merged[customer] = target
     return merged
 
 
@@ -614,11 +628,7 @@ def build_lookup_context(region_master: Path) -> dict[str, Any]:
         sheet_name="基础3客户合并",
         engine="openpyxl",
     )
-    merged_customers = {
-        clean_code(row.get("客户编码")): clean_code(row.get("合并-促销"))
-        for row in merge_sheet.to_dict("records")
-        if clean_code(row.get("客户编码")) and clean_code(row.get("合并-促销"))
-    }
+    merged_customers = promotion_customer_merges(merge_sheet.to_dict("records"))
     if KA_CUSTOMER_MERGE_SUPPLEMENT.exists():
         ka_merges = json.loads(KA_CUSTOMER_MERGE_SUPPLEMENT.read_text(encoding="utf-8"))
         for customer, merge in ka_merges.items():
@@ -702,8 +712,8 @@ def build_lookup_context(region_master: Path) -> dict[str, Any]:
             merge_id = clean_code(details.get("mcid"))
             merge_name = clean_str(details.get("mcn"))
             if name:
-                customer_names[customer] = name
-                listed_names[customer] = name
+                customer_names.setdefault(customer, name)
+                listed_names.setdefault(customer, name)
             if city:
                 customer_cities[customer] = city
                 geo = canonical_geo.setdefault(customer, {})
