@@ -51,6 +51,9 @@ def read_dashboard_html(path: Path) -> str:
 # Explicit location supplements confirmed from public records or by the user.
 # These are keyed by customer ID; office names are never used to infer geography.
 RESEARCHED_GEO: dict[str, dict[str, str]] = {
+    "299156": {"p": "台湾省", "source": "用户确认：中国台湾地区，2026-11-06"},
+    "261172": {"p": "广东省", "ct": "广州", "source": "用户确认：广州经济技术开发区东区联广路333号，2026-11-06"},
+    "274829": {"p": "陕西省", "ct": "安康", "source": "用户确认：陕西省安康市高新技术产业开发区安康智慧物流园，2026-11-06"},
     "274723": {"p": "上海市", "ct": "上海", "source": "用户确认：上海，2026-09-08"},
     "274745": {"p": "辽宁省", "ct": "沈阳", "source": "用户确认：辽宁沈阳，2026-09-08"},
     "274747": {"p": "江苏省", "ct": "常州", "source": "用户确认：江苏省常州市，2026-09-08"},
