@@ -1,0 +1,15 @@
+{
+  "customer_master": {
+    "name": "10月客户明细及合并.xlsx",
+    "sha256": "20c96a63984c887090de617476b014e9ca6d211b43198b12ddc81a5bc87584f5"
+  },
+  "ka_brands": {
+    "name": "KA客户明细前十 2610新.xlsx",
+    "sha256": "8a6708a5d709b0a50761c91fdc008fdcd6a486e49344a3329f9f380f9d28e79d"
+  },
+  "brand_customer_count": 390,
+  "new_customer_count": 10,
+  "changed_customer_count": 3,
+  "priority": "explicit KA brand group > current promotion merge > historical fallback",
+  "scope": "same customer/brand grouping for both 2025 and 2026; no metric overrides"
+}
