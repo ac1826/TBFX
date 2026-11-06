@@ -46,14 +46,14 @@ def test_sales_dashboard_contains_comparable_2025_monthly_detail() -> None:
     expected_prior = sales_rows_from_yoy(yoy["records"])
 
     assert len(prior) == len(expected_prior) > 0
-    assert {row["mo"] for row in prior} == {f"2025.{month:02d}" for month in range(1, 10)}
+    assert {row["mo"] for row in prior} == {f"2025.{month:02d}" for month in range(1, 11)}
     assert sum(row["inc"] for row in prior) == pytest.approx(
         yoy["quality"]["detail_totals"]["2025"]["income_k"], abs=0.01
     )
     prior_adjustments = [
         row for row in sales["netContributionAdjustments"] if row["mr"].startswith("2025.")
     ]
-    assert len(prior_adjustments) == 8
+    assert len(prior_adjustments) == 39
 
 
 def test_september_merges_supplement_previous_customer_merges() -> None:
@@ -152,7 +152,7 @@ def test_month_cn_keeps_plain_month_values() -> None:
 
 
 def test_dashboard_filter_orders_include_latest_month_and_eight_channels() -> None:
-    assert YOY_MONTH_ORDER == [f"{month}月" for month in range(1, 10)]
+    assert YOY_MONTH_ORDER == [f"{month}月" for month in range(1, 11)]
     assert YOY_CHANNEL_ORDER == ["烘焙", "休闲", "团膳", "宴席", "零售", "KA", "鲜食工厂", "其他"]
 
 
