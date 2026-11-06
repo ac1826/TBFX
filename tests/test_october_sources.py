@@ -1,6 +1,6 @@
 from tools.update_dashboard_data import (
     CUSTOMER_LIST_NAME, SOURCE_2025_NAME, SOURCE_2026_NAME, YOY_MONTH_ORDER,
-    SALES_STATIC, YOY_STATIC, RESEARCHED_GEO, load_app_data,
+    SALES_STATIC, YOY_STATIC, RESEARCHED_GEO, load_app_data, sync_available_periods,
 )
 
 
@@ -13,6 +13,31 @@ def test_october_sources_and_months():
         assert any(row.get('mo') in {'10月', '2026.10'} for row in data['records'])
     data = load_app_data(SALES_STATIC)
     assert {'2025.10', '2026.10'}.issubset(data['monthOrder'])
+    assert data['monthOrder'] == sorted({row['mo'] for row in data['records']})
+
+
+def test_available_periods_follow_detail_across_future_years():
+    data = {'monthOrder': ['2025.09'], 'records': [
+        {'mo': '2026.10'}, {'mo': '2025.10'}, {'mo': '2027.01'},
+        {'mo': '2026.10'}, {'mo': ''},
+    ]}
+    sync_available_periods(data)
+    assert data['monthOrder'] == ['2025.10', '2026.10', '2027.01']
+
+
+def test_browser_month_options_ignore_stale_metadata():
+    import gzip
+    import re
+    import subprocess
+    html = gzip.decompress(SALES_STATIC.read_bytes()).decode('utf-8')
+    declaration = re.search(r'const MONTH_ORDER = [^;]+;', html).group()
+    script = (
+        "const APP_DATA={monthOrder:['2025.09']};"
+        "const RAW=[{mo:'2025.10'},{mo:'2026.10'},{mo:'2027.01'}];"
+        + declaration
+        + "if(JSON.stringify(MONTH_ORDER)!==JSON.stringify(['2025.10','2026.10','2027.01']))throw Error(JSON.stringify(MONTH_ORDER));"
+    )
+    subprocess.check_call(['node', '-e', script])
 
 
 def test_user_confirmed_provinces_are_in_the_sales_snapshot():
