@@ -21,21 +21,21 @@ SALES_STATIC = STATIC_DIR / "2026-sales-dashboard.html.gz"
 YOY_STATIC = STATIC_DIR / "2026-vs-2025-yoy-dashboard.html.gz"
 
 F_DIR = Path("F:/llqdocument/大成文件/客户贡献分析")
-SOURCE_2026_NAME = "PFS 26年毛利表1-9月含电商 TOP20新版.xlsx"
-SOURCE_2025_NAME = "PFS 25年毛利表1-9月 含电商 TOP20 -品项实际 新版.xlsx"
+SOURCE_2026_NAME = "PFS 26年毛利表1-10月含电商 TOP20新版.xlsx"
+SOURCE_2025_NAME = "PFS 25年毛利表1-10月 含电商 TOP20 -品项实际 新版.xlsx"
 # Compare only periods supported by both annual workbooks.
-YOY_MONTH_ORDER = [f"{month}月" for month in range(1, 10)]
+YOY_MONTH_ORDER = [f"{month}月" for month in range(1, 11)]
 YOY_CHANNEL_ORDER = ["烘焙", "休闲", "团膳", "宴席", "零售", "KA", "鲜食工厂", "其他"]
 CUSTOMER_MASTER_NAME = "7月客户渠道及合并汇总.xlsx"
 CHANNEL_CLASSIFICATION_NAME = "渠道分类.xlsx"
 ORG_MASTER_NAME = "销售办事处组织架构及渠道.xlsx"
-CUSTOMER_LIST_NAME = "客户清单_10月.xlsx"
+CUSTOMER_LIST_NAME = "客户清单_11.xlsx"
 CUSTOMER_MAPPING_SUPPLEMENT_NAME = "清单1.xlsx"
 KA_CUSTOMER_MERGE_SUPPLEMENT = REPO_ROOT / "streamlit_html_portal/static/ka-customer-merge.json"
 SEPTEMBER_CUSTOMER_MASTER = REPO_ROOT / "streamlit_html_portal/static/customer-master-september.json"
 REFERENCE_HTML_NAME = "2026年1-6月主次渠道分析仪表盘.html"
-SALES_SOURCE_HTML = F_DIR / "2026年1-9月数据分析仪表盘.html"
-YOY_SOURCE_HTML = F_DIR / "26年与25年_1-9月数据对比分析.html"
+SALES_SOURCE_HTML = F_DIR / "2026年1-10月数据分析仪表盘.html"
+YOY_SOURCE_HTML = F_DIR / "26年与25年_1-10月数据对比分析.html"
 
 BAD_CODES = {"CA2428001", "CC1131011"}
 DELETE_MARKER = "删"
@@ -158,7 +158,8 @@ def replace_app_data(path: Path, data: dict[str, Any]) -> None:
         text = text.replace(
             "。2025年明细截至8月，同比仅比较双方都有数据的1—8月。", "",
         )
-        text = text.replace("2026年1-8月累计同比2025年分析", "2026年1-9月累计同比2025年分析")
+        text = text.replace("2026年1-8月累计同比2025年分析", "2026年1-10月累计同比2025年分析")
+        text = text.replace("2026年1-9月累计同比2025年分析", "2026年1-10月累计同比2025年分析")
     start, end, _ = extract_app_data(text)
     payload = json.dumps(data, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
     path.write_bytes(gzip.compress((text[:start] + payload + text[end:]).encode("utf-8"), mtime=0))
@@ -1219,14 +1220,14 @@ def write_unmapped_report(
 def update_quality_sales(data: dict[str, Any], records: list[dict[str, Any]], adjustments: list[dict[str, Any]], source_2026: Path, stats_2026: dict[str, Any]) -> None:
     quality = data.setdefault("quality", {})
     quality["comparable_region_rule"] = "两年统一2026年RKA范围：7350、7559及塔斯汀品牌账户归RKA；7550其他客户不迁移；3005及7420特殊口径不变"
-    quality["period"] = "2026.01-2026.09"
+    quality["period"] = "2026.01-2026.10"
     quality["source"] = str(source_2026)
     quality["income_metric_source"] = "销售额（含税销额）"
     quality["gross_income_metric_source"] = "销售额（含税销额）"
     quality["net_margin_rate_formula"] = "扣除折让运费后的净边贡 / (销售收入 - 分摊后折让)"
     quality["net_income_metric_source"] = "销售收入（未税收入）"
     quality["rows"] = len(records)
-    quality["month_order"] = [f"2026.{month:02d}" for month in range(1, 10)]
+    quality["month_order"] = [f"2026.{month:02d}" for month in range(1, 11)]
     quality["sku_cnt"] = len({record["pc"] for record in records if record.get("pc")})
     quality["customer_cnt"] = len({record["cid"] for record in records if record.get("cid")})
     quality["merged_customer_cnt"] = len({record["mcid"] for record in records if record.get("mcid")})
@@ -1359,10 +1360,10 @@ def main() -> None:
     sales_records = build_sales_records(detail_2026, context)
     detail_2025, adjustment_rows_2025 = split_office_adjustments_2026(clean_2025, 2025)
     adjustments_2025 = build_office_adjustments_2026(adjustment_rows_2025, context, 2025)
-    if len(adjustments_2025) != 8 or not math.isclose(sum(row["nm"] for row in adjustments_2025), 15.93947, abs_tol=1e-6):
+    if len(adjustments_2025) != 39 or not math.isclose(sum(row["nm"] for row in adjustments_2025), 324.4217, abs_tol=1e-6):
         raise ValueError(
             f"2025 office adjustments: rows={len(adjustments_2025)}, "
-            f"net={sum(row['nm'] for row in adjustments_2025)}; expected 8 rows / 15.93947 thousand"
+            f"net={sum(row['nm'] for row in adjustments_2025)}; expected 39 rows / 324.4217 thousand"
         )
     yoy_adjustments = adjustments_2025 + adjustments
     yoy_raw = build_yoy_rows_2025(detail_2025, context) + build_yoy_rows_2026(detail_2026, context)
@@ -1401,8 +1402,8 @@ def main() -> None:
     # The sales dashboard can inspect either year's monthly detail.  Keep the
     # 2025 rows in the prior-year payload while exposing both years in the filter.
     sales_data["monthOrder"] = [
-        *[f"2025.{month:02d}" for month in range(1, 10)],
-        *[f"2026.{month:02d}" for month in range(1, 10)],
+        *[f"2025.{month:02d}" for month in range(1, 11)],
+        *[f"2026.{month:02d}" for month in range(1, 11)],
     ]
     sales_data["channelOrder"] = YOY_CHANNEL_ORDER
     region_order = list(sales_data.get("newRegionOrder") or [])
