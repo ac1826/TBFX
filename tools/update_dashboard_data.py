@@ -14,6 +14,11 @@ from typing import Any
 import openpyxl
 import pandas as pd
 
+try:
+    from tools.product_classification import repair_product_rows, OVERRIDES as PRODUCT_OVERRIDES
+except ModuleNotFoundError:
+    from product_classification import repair_product_rows, OVERRIDES as PRODUCT_OVERRIDES
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 STATIC_DIR = REPO_ROOT / "streamlit_html_portal" / "static"
@@ -165,6 +170,18 @@ def sync_available_periods(data: dict[str, Any]) -> None:
 
 
 def replace_app_data(path: Path, data: dict[str, Any]) -> None:
+    repaired = repair_product_rows(data["records"])
+    unresolved = {row.get("pc", "") for row in data["records"] if row["cat"] == "未映射"}
+    if unresolved:
+        raise ValueError(f"Missing product classifications: {sorted(unresolved)}")
+    data.setdefault("quality", {})["product_classification_overrides"] = PRODUCT_OVERRIDES
+    if repaired:
+        data["quality"]["product_classification_repairs"] = repaired
+    if path == SALES_STATIC:
+        latest_year = max(str(row["mo"])[:4] for row in data["records"])
+        current = [row for row in data["records"] if str(row["mo"]).startswith(latest_year + ".")]
+        data["quality"]["category_cnt"] = len({row["cat"] for row in current})
+        data["quality"]["item_cnt"] = len({row["item"] for row in current})
     sync_available_periods(data)
     text = gzip.decompress(path.read_bytes()).decode("utf-8", errors="replace")
     # The browser also derives sales options from detail to tolerate stale metadata.
