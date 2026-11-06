@@ -155,8 +155,25 @@ def extract_app_data(text: str) -> tuple[int, int, dict[str, Any]]:
     raise ValueError("APP_DATA JSON end not found")
 
 
+def sync_available_periods(data: dict[str, Any]) -> None:
+    """Keep sales period options tied to the shipped detail, never a fixed cutoff."""
+    periods = {str(row.get("mo", "")) for row in data["records"]}
+    if any(re.fullmatch(r"\d{4}\.\d{2}", period) for period in periods):
+        data["monthOrder"] = sorted(
+            period for period in periods if re.fullmatch(r"\d{4}\.\d{2}", period)
+        )
+
+
 def replace_app_data(path: Path, data: dict[str, Any]) -> None:
+    sync_available_periods(data)
     text = gzip.decompress(path.read_bytes()).decode("utf-8", errors="replace")
+    # The browser also derives sales options from detail to tolerate stale metadata.
+    if path == SALES_STATIC:
+        text = text.replace(
+            "const MONTH_ORDER = APP_DATA.monthOrder;",
+            "const MONTH_ORDER = [...new Set(RAW.map(row => String(row.mo || '')))"
+            ".values()].filter(period => /^\\d{4}\\.\\d{2}$/.test(period)).sort();",
+        )
     if path == YOY_STATIC:
         text = text.replace(
             "。2025年明细截至8月，同比仅比较双方都有数据的1—8月。", "",
@@ -1404,10 +1421,7 @@ def main() -> None:
     sales_data["netContributionAdjustments"] = adjustments
     # The sales dashboard can inspect either year's monthly detail.  Keep the
     # 2025 rows in the prior-year payload while exposing both years in the filter.
-    sales_data["monthOrder"] = [
-        *[f"2025.{month:02d}" for month in range(1, 11)],
-        *[f"2026.{month:02d}" for month in range(1, 11)],
-    ]
+    # replace_app_data derives monthOrder after both annual detail sets are joined.
     sales_data["channelOrder"] = YOY_CHANNEL_ORDER
     region_order = list(sales_data.get("newRegionOrder") or [])
     if "GKA" not in region_order:
