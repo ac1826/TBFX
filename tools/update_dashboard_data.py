@@ -226,24 +226,14 @@ def sales_rows_from_yoy(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def inject_standalone_customer_yoy(html: str) -> str:
-    helper_path = REPO_ROOT / "tools" / "customer_rank_yoy.js"
-    helper = helper_path.read_text(encoding="utf-8").split("\nif (typeof module !== 'undefined')", 1)[0]
-    helper = helper.replace("function customerRankYoyRuntime(", "function customerRankYoyRuntimeFixed(", 1)
-    marker = "    fetch('2026-vs-2025-yoy-dashboard.html').then(response => {"
-    start = html.find(marker)
-    if start >= 0:
-        end = html.find("    window.addEventListener('resize'", start)
-        if end >= 0:
-            html = html[:start] + html[end:]
-    script = (
-        "<script>\n" + helper + "\n"
-        "customerRankYoyRuntimeFixed(RAW.filter(row => String(row.mo || '').startsWith('2025.')));\n"
-        "</script>\n"
-    )
-    closing_body = html.rfind("</body>")
-    if closing_body < 0:
-        raise ValueError("Sales dashboard has no closing body tag")
-    return html[:closing_body] + script + html[closing_body:]
+    # This tool is also run directly from tools/, where the repo root is not on sys.path.
+    sys.path.insert(0, str(REPO_ROOT))
+    try:
+        from streamlit_html_portal.customer_yoy import inject_customer_yoy
+
+        return inject_customer_yoy(html)
+    finally:
+        sys.path.pop(0)
 
 
 def load_app_data(path: Path) -> dict[str, Any]:

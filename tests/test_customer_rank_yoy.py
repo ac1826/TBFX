@@ -19,7 +19,8 @@ def test_streamlit_yoy_injection_reuses_existing_raw_rows() -> None:
     assert "customerRankYoyRuntimeFixed(RAW.filter" in result
     assert "fetch('2026-vs-2025-yoy-dashboard.html')" not in result
     assert "__PRIOR_DETAIL__" not in result
-    assert len(result.encode("utf-8")) < 12_000
+    assert "customerSummaryRuntime();" in result
+    assert len(result.encode("utf-8")) < 24_000
 
 
 def test_customer_tooltip_yoy_respects_filters_and_distinct_skus():
