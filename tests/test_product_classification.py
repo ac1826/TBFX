@@ -15,8 +15,10 @@ def test_confirmed_product_categories_and_preserved_metrics():
 
 
 def test_published_payloads_contain_no_blank_or_excel_error_dimensions():
-    expected = {'CP3829005': '芝士类', 'CC1140005': '盐酥鸡类',
-                'CC7422005': '裹粉原肉类', 'CK1122118': '香肠类'}
+    expected = {'CP3829005': ('芝士类', '高熔点奶酪', 2.0, 132.0),
+                'CC1140005': ('盐酥鸡类', '胸盐', .72, 9.0),
+                'CC7422005': ('裹粉原肉类', '裹粉猪排', .86, 22.36),
+                'CK1122118': ('香肠类', '原味德肠', .984, 25.584)}
     for path in [SALES_STATIC, YOY_STATIC]:
         html = gzip.decompress(path.read_bytes()).decode()
         start = re.search(r'const APP_DATA\s*=\s*', html).end()
@@ -24,6 +26,12 @@ def test_published_payloads_contain_no_blank_or_excel_error_dimensions():
         for row in data['records']:
             assert row['cat'] and not row['cat'].startswith('#')
             assert row['item'] and not row['item'].startswith('#')
-        for material, category in expected.items():
-            rows = [row for row in data['records'] if row['pc'] == material]
-            assert rows and all(row['cat'] == category and row['item'] == row['pn'] for row in rows)
+        for material, (category, item, volume, sales) in expected.items():
+            rows = [
+                row for row in data['records']
+                if row['pc'] == material
+                and (str(row.get('y')) == '2026' or row['mo'].startswith('2026.'))
+            ]
+            assert rows and all(row['cat'] == category and row['item'] == item for row in rows)
+            assert abs(sum(row['v'] for row in rows) - volume) < 1e-8
+            assert abs(sum(row['inc'] for row in rows) - sales) < 1e-8
