@@ -4,6 +4,19 @@ from tools.update_dashboard_data import (
 )
 
 
+def test_current_adjustments_match_revised_workbook():
+    rows = load_app_data(SALES_STATIC)["netContributionAdjustments"]
+    current = [row for row in rows if row["mr"].startswith("2026.")]
+    prior = [row for row in rows if row["mr"].startswith("2025.")]
+    assert len(prior) == 39
+    assert len(current) == 26
+    assert {month: sum(row["mr"] == month for row in current) for month in {row["mr"] for row in current}} == {
+        "2026.08": 19, "2026.09": 7,
+    }
+    assert round(sum(row["nm"] for row in current), 6) == -123.55915
+    assert round(sum(row["ad"] for row in current), 6) == 123.55915
+
+
 def test_october_sources_and_months():
     assert '1-10月' in SOURCE_2025_NAME and '1-10月' in SOURCE_2026_NAME
     assert CUSTOMER_LIST_NAME == '客户清单_11.xlsx'

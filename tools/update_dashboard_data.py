@@ -46,8 +46,9 @@ BAD_CODES = {"CA2428001", "CC1131011"}
 DELETE_MARKER = "删"
 UNMAPPED = "未映射"
 UNMAPPED_OUTPUT = F_DIR / "未映射明细.xlsx"
-OFFICE_ADJUSTMENT_EXPECTED_ROWS = 172
-OFFICE_ADJUSTMENT_EXPECTED_NET_MARGIN_K = 922.40665
+# November 9 workbook revision: 19 August rows and 7 September rows.
+OFFICE_ADJUSTMENT_EXPECTED_ROWS = 26
+OFFICE_ADJUSTMENT_EXPECTED_NET_MARGIN_K = -123.55915
 
 
 def read_dashboard_html(path: Path) -> str:
@@ -871,6 +872,22 @@ def filter_2025(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, Any]]:
     }
 
 
+def resolve_merged_customer(
+    customer_id: str, customer_name: str, context: dict[str, Any]
+) -> tuple[str, str]:
+    """Share the sales dashboard's customer identity with other report builders."""
+    cid = clean_code(customer_id)
+    reference = context["reference_maps"].get(cid) or {}
+    merged_id = context["merged_customers"].get(cid) or reference.get("mcid") or cid
+    merged_name = (
+        context["customer_names"].get(merged_id)
+        or context["listed_names"].get(merged_id)
+        or reference.get("mcn")
+        or (clean_str(customer_name) if merged_id == cid else UNMAPPED)
+    )
+    return merged_id, merged_name
+
+
 def enrich_sales(record: dict[str, Any], context: dict[str, Any], year: int = 2026) -> dict[str, str]:
     cid = clean_code(record.get("客户编码"))
     cn = clean_str(record.get("客户描述"))
@@ -885,7 +902,7 @@ def enrich_sales(record: dict[str, Any], context: dict[str, Any], year: int = 20
     confirmed_geo = context.get("user_confirmed_geo_2026", {}).get(cid, {})
     code = office_code(office)
     canonical_region = context["canonical_region"].get(code, "")
-    merged_id = context["merged_customers"].get(cid) or reference.get("mcid") or cid
+    merged_id, merged_name = resolve_merged_customer(cid, cn, context)
     merged_geo = context["canonical_geo"].get(merged_id) or {}
     merged_org_customer = context["org_customers"].get(merged_id) or {}
     primary_city = (
@@ -945,7 +962,7 @@ def enrich_sales(record: dict[str, Any], context: dict[str, Any], year: int = 20
         "ch": channel,
         "nr": region,
         "mcid": merged_id,
-        "mcn": context["customer_names"].get(merged_id) or context["listed_names"].get(merged_id) or reference.get("mcn") or (cn if merged_id == cid else UNMAPPED),
+        "mcn": merged_name,
         "name_match_status": name_match["status"],
     }
 
