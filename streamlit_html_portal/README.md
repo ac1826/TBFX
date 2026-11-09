@@ -25,3 +25,5 @@ py -3 -m streamlit run streamlit_html_portal/app.py
 - `tests/`：数据更新和同比逻辑测试。
 
 大区同比规则及数据口径由 `tools/update_dashboard_data.py` 维护。HTML gzip 只改变存储和传输形式，不改变解压后的看板内容。
+
+销售和同比看板在生成商品明细前排除物料 `CA2428001`，以及物料描述、品类或品项含「香菇猪肉派」的记录；销售页前20表使用同一份过滤后的明细。独立的办事处级调整不受这项商品排除影响。

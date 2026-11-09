@@ -2,8 +2,22 @@ import gzip
 import json
 import re
 
-from tools.product_classification import product_dimensions, repair_product_rows
-from tools.update_dashboard_data import SALES_STATIC, YOY_STATIC
+import pandas as pd
+
+from tools.product_classification import is_excluded_pork_pie, product_dimensions, repair_product_rows
+from tools.update_dashboard_data import SALES_STATIC, YOY_STATIC, fake_product_mask
+
+
+def test_product_exclusion_keeps_other_products_and_office_adjustments():
+    records = [
+        ("CA2428001", "其他描述", "调理品", "其他"),
+        ("OTHER", "香菇 豬肉派3000g×4", "调理品", "其他"),
+        ("OTHER", "正常描述", "调理品", "香菇猪肉派"),
+        ("OTHER", "香菇猪肉馅", "调理品", "其他"),
+        (None, None, None, None),
+    ]
+    data = pd.DataFrame(records, columns=["物料号", "物料描述", "品类", "品项"])
+    assert fake_product_mask(data).tolist() == [True, True, True, False, False]
 
 
 def test_confirmed_product_categories_and_preserved_metrics():
@@ -26,6 +40,7 @@ def test_published_payloads_contain_no_blank_or_excel_error_dimensions():
         for row in data['records']:
             assert row['cat'] and not row['cat'].startswith('#')
             assert row['item'] and not row['item'].startswith('#')
+            assert not is_excluded_pork_pie(row.get('pc'), row.get('pn'), row['cat'], row['item'])
         for material, (category, item, volume, sales) in expected.items():
             rows = [
                 row for row in data['records']

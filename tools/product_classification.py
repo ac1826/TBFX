@@ -1,5 +1,6 @@
 """Safe product dimensions; numeric business fields are never modified here."""
 import json
+import unicodedata
 from pathlib import Path
 
 OVERRIDES_PATH = Path(__file__).resolve().parents[1] / 'streamlit_html_portal/static/product-classification-overrides.json'
@@ -11,6 +12,16 @@ INVALID_LABELS = {'', '#N/A', '#VALUE!', '#REF!', '#DIV/0!', '#NAME?', '#NUM!', 
 def product_label(value):
     label = str(value).strip() if value is not None else ''
     return '' if label.upper() in INVALID_LABELS else label
+
+
+def is_excluded_pork_pie(material, *labels):
+    """Match the retired product by code or its name, even with a package suffix."""
+    if unicodedata.normalize("NFKC", str(material or "")).strip().upper() == "CA2428001":
+        return True
+    return any(
+        "香菇猪肉派" in "".join(str(label).split()).replace("豬", "猪")
+        for label in labels if label is not None
+    )
 
 
 def product_dimensions(material, description, category, item):

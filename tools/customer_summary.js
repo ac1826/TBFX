@@ -66,11 +66,18 @@ function customerSummaryRuntime() {
     <p class="customer-summary-scroll-note">横向滑动查看全部指标</p>
     <div class="table-wrap customer-summary-scroll" tabindex="0" role="region" aria-labelledby="customer-summary-title">
       <table aria-labelledby="customer-summary-title">
+        <colgroup>
+          <col class="summary-rank-col"><col class="summary-name-col">
+          <col class="summary-amount-col"><col class="summary-change-col">
+          <col class="summary-amount-col"><col class="summary-change-col">
+          <col class="summary-rate-col"><col class="summary-rate-change-col">
+          <col class="summary-type-col">
+        </colgroup>
         <thead><tr>
-          <th scope="col">排名</th><th scope="col">客户名称</th><th scope="col">类型</th>
+          <th scope="col">排名</th><th scope="col">客户名称</th>
           <th scope="col">销额</th><th scope="col">销额同比</th>
           <th scope="col">净边贡</th><th scope="col">净边贡同比</th>
-          <th scope="col">净边贡率</th><th scope="col">净边贡率同比</th>
+          <th scope="col">净边贡率</th><th scope="col">净边贡率同比</th><th scope="col">类型</th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -81,13 +88,28 @@ function customerSummaryRuntime() {
     .customer-summary .panel-head { flex-wrap:wrap; align-items:baseline; }
     .customer-summary .panel-note { text-align:left; }
     .customer-summary-period { margin:8px 0 12px; color:var(--muted); font-size:13px; line-height:1.5; }
-    .customer-summary-scroll { max-height:none; }
+    .customer-summary-scroll { max-height:none; container-type:inline-size; }
     .customer-summary-scroll:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-    .customer-summary table { min-width:820px; font-variant-numeric:tabular-nums; }
-    .customer-summary :is(th,td):nth-child(n+4) { text-align:right; }
-    .customer-summary :is(th,td):first-child { text-align:center; width:48px; color:var(--muted); }
+    .customer-summary table {
+      --summary-name-width:clamp(166px, 12cqw, 196px);
+      --summary-type-width:clamp(96px, 15cqw, 192px);
+      /* Give type a bounded share before distributing the remainder across the metrics. */
+      --summary-extra:calc((max(780px, 100cqw) - 508px - var(--summary-name-width) - var(--summary-type-width)) / 6);
+      min-width:780px; table-layout:fixed; font-variant-numeric:tabular-nums;
+    }
+    .customer-summary .summary-rank-col { width:40px; }
+    .customer-summary .summary-name-col { width:166px; width:var(--summary-name-width); }
+    .customer-summary .summary-amount-col,
+    .customer-summary .summary-rate-col { width:calc(72px + var(--summary-extra)); }
+    .customer-summary .summary-change-col { width:calc(78px + var(--summary-extra)); }
+    .customer-summary .summary-rate-change-col { width:calc(96px + var(--summary-extra)); }
+    .customer-summary .summary-type-col { width:96px; width:var(--summary-type-width); }
+    .customer-summary :is(th,td) { padding:6px 8px; line-height:1.35; }
+    .customer-summary :is(th,td):nth-child(n+3):nth-child(-n+8) { text-align:right; }
+    .customer-summary :is(th,td):first-child { text-align:center; color:var(--muted); }
+    .customer-summary :is(th,td):last-child:not([colspan]) { text-align:center; border-left:1px solid var(--line); }
     .customer-summary tbody th { position:static; background:transparent; color:var(--text);
-      font-weight:600; white-space:normal; min-width:145px; max-width:300px; }
+      font-weight:600; white-space:normal; overflow-wrap:anywhere; }
     .customer-summary tbody tr:nth-child(even) { background:#f8fafc; }
     .customer-summary tbody tr:hover { background:#eef8f8; }
     .customer-summary .customer-type { display:inline-block; padding:2px 7px; border-radius:4px;
@@ -96,15 +118,9 @@ function customerSummaryRuntime() {
     .customer-summary .customer-empty { text-align:center !important; padding:24px; }
     .customer-summary .negative { color:#b4232c; }
     .customer-summary-scroll-note { display:none; margin:0 0 8px; font-size:12px; color:var(--muted); }
-    @media (max-width:920px) {
+    @media (max-width:820px) {
       .customer-summary-scroll-note { display:block; }
-      .customer-summary table { table-layout:fixed; }
-      .customer-summary :is(th,td) { padding-inline:7px; }
-      .customer-summary thead th:nth-child(1) { width:38px; }
-      .customer-summary thead th:nth-child(2) { width:126px; }
-      .customer-summary thead th:nth-child(3) { width:48px; }
-      .customer-summary thead th:nth-child(4) { width:78px; }
-      .customer-summary tbody th { min-width:0; overflow-wrap:anywhere; }
+      .customer-summary table { --summary-name-width:132px; }
     }
   `;
   document.head.append(style);
@@ -164,14 +180,14 @@ function customerSummaryRuntime() {
       const tr = document.createElement('tr');
       add(tr, String(index + 1).padStart(2,'0'));
       add(tr, customer.name, {header:true});
-      const type = document.createElement('span');
-      type.className = 'customer-type' + (customer.type === 'KA' ? ' customer-type-ka' : '');
-      type.textContent = customer.type;
-      add(tr, '').append(type);
       add(tr, money.format(customer.sales)); delta(tr, customer.salesYoy, '%');
       add(tr, money.format(customer.margin)); delta(tr, customer.marginYoy, '%');
       add(tr, customer.rate === null ? '—' : (customer.rate * 100).toFixed(1) + '%');
       delta(tr, customer.rateYoy, ' pp');
+      const type = document.createElement('span');
+      type.className = 'customer-type' + (customer.type === 'KA' ? ' customer-type-ka' : '');
+      type.textContent = customer.type;
+      add(tr, '').append(type);
       fragment.append(tr);
     });
     if (!data.top.length) {
