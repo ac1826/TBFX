@@ -15,9 +15,9 @@ import openpyxl
 import pandas as pd
 
 try:
-    from tools.product_classification import repair_product_rows, OVERRIDES as PRODUCT_OVERRIDES
+    from tools.product_classification import is_excluded_pork_pie, repair_product_rows, OVERRIDES as PRODUCT_OVERRIDES
 except ModuleNotFoundError:
-    from product_classification import repair_product_rows, OVERRIDES as PRODUCT_OVERRIDES
+    from product_classification import is_excluded_pork_pie, repair_product_rows, OVERRIDES as PRODUCT_OVERRIDES
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -171,6 +171,9 @@ def sync_available_periods(data: dict[str, Any]) -> None:
 
 
 def replace_app_data(path: Path, data: dict[str, Any]) -> None:
+    if any(is_excluded_pork_pie(row.get("pc"), row.get("pn"), row.get("cat"), row.get("item"))
+           for row in data["records"]):
+        raise ValueError("Excluded mushroom pork pie found in dashboard records")
     repaired = repair_product_rows(data["records"])
     unresolved = {row.get("pc", "") for row in data["records"] if row["cat"] == "未映射"}
     if unresolved:
@@ -820,11 +823,14 @@ def split_office_adjustments_2026(df: pd.DataFrame, year: int = 2026) -> tuple[p
 
 def fake_product_mask(df: pd.DataFrame) -> pd.Series:
     code = df["物料号"].map(clean_code)
-    delete_mask = df.apply(
-        lambda row: has_delete_marker(row.get("物料描述"), row.get("品类"), row.get("品项")),
+    label_mask = df.apply(
+        lambda row: (
+            has_delete_marker(row.get("物料描述"), row.get("品类"), row.get("品项"))
+            or is_excluded_pork_pie(row.get("物料号"), row.get("物料描述"), row.get("品类"), row.get("品项"))
+        ),
         axis=1,
     )
-    return code.isin(BAD_CODES) | delete_mask
+    return code.isin(BAD_CODES) | label_mask
 
 
 def filter_2026(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, Any]]:
