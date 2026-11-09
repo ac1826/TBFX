@@ -2,12 +2,16 @@ from pathlib import Path
 
 
 def customer_yoy_runtime() -> str:
-    helper_path = Path(__file__).parents[1] / "tools" / "customer_rank_yoy.js"
+    tools = Path(__file__).parents[1] / "tools"
+    helper_path = tools / "customer_rank_yoy.js"
     helper = helper_path.read_text(encoding="utf-8").split("\nif (typeof module !== 'undefined')", 1)[0]
     helper = helper.replace("function customerRankYoyRuntime(", "function customerRankYoyRuntimeFixed(", 1)
+    summary = (tools / "customer_summary.js").read_text(encoding="utf-8").split("\nif (typeof module !== 'undefined')", 1)[0]
     return (
         f"{helper}\n"
         "customerRankYoyRuntimeFixed(RAW.filter(row => String(row.mo || '').startsWith('2025.')));\n"
+        f"{summary}\n"
+        "customerSummaryRuntime();\n"
     )
 
 
